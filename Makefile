@@ -25,9 +25,29 @@ TPAGE_ARGS = --define kb_top=$(TARGET) --define kb_runtime=$(DEPLOY_RUNTIME) --d
 	--define kb_starman_workers=$(STARMAN_WORKERS) \
 	--define kb_starman_max_requests=$(STARMAN_MAX_REQUESTS)
 
-all: bin 
+PRIMER_SRC = https://raw.githubusercontent.com/CDCgov/SARS-CoV-2_Sequencing/master/protocols/CDC-Comprehensive/Multiplex_PCR/SC2_200324.bedpe
+
+all: bin primer artic_schemes reference
 
 bin: $(BIN_PERL) $(BIN_SERVICE_PERL)
+
+reference: lib/Bio/P3/SARS2Assembly/MN908947.fasta.fai
+
+lib/Bio/P3/SARS2Assembly/MN908947.fasta.fai: lib/Bio/P3/SARS2Assembly/MN908947.fasta
+	bowtie2-build  lib/Bio/P3/SARS2Assembly/MN908947.fasta lib/Bio/P3/SARS2Assembly/MN908947.fasta
+	$(KB_RUNTIME)/samtools-1.9/bin/samtools faidx lib/Bio/P3/SARS2Assembly/MN908947.fasta
+
+primer: lib/Bio/P3/SARS2Assembly/SC2_200324.bedpe
+
+lib/Bio/P3/SARS2Assembly/SC2_200324.bedpe:
+	curl -o $@ -L $(PRIMER_SRC)
+
+artic_schemes: lib/Bio/P3/SARS2Assembly/primer_schemes
+
+lib/Bio/P3/SARS2Assembly/primer_schemes:
+	rm -rf artic-ncov2019
+	git clone https://github.com/artic-network/artic-ncov2019.git
+	cp -r artic-ncov2019/primer_schemes lib/Bio/P3/SARS2Assembly
 
 deploy: deploy-all
 deploy-all: deploy-client 
