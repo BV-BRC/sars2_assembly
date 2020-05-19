@@ -19,6 +19,8 @@ use strict;
 use Getopt::Long::Descriptive;
 use Bio::P3::SARS2Assembly 'run_cmds';
 use File::Basename;
+use File::Copy qw(move);
+use File::Temp;
 
 my($opt, $usage) = describe_options("%c %o reads output-base output-dir",
 				    ["scheme=s" => "Artic scheme", { default => "nCoV-2019/V3" }],
@@ -37,6 +39,7 @@ my $out_dir = shift;
 my $scheme_dir = Bio::P3::SARS2Assembly::artic_primer_schemes_path();
 
 -d $out_dir or mkdir($out_dir) or die "Cannot create $out_dir: $!";
+my $tmpdir = File::Temp->newdir(CLEANUP => 1);
 
 my $threads = $opt->threads;
 
@@ -45,6 +48,13 @@ my $threads = $opt->threads;
 #
 $ENV{PATH} = "$ENV{KB_RUNTIME}/artic/bin:$ENV{PATH}";
 
+#
+# If not running with keep-intermediates, We run writing to our temp space,
+# then move any files we are keeping into the destination.
+#
+
+my $run_dir = $opt->keep_intermediates ? $out_dir : $tmpdir;
+
 my @artic = ("artic", "minion",
 	     "--medaka",
 	     "--normalise", 200,
@@ -52,7 +62,25 @@ my @artic = ("artic", "minion",
 	     "--scheme-directory", $scheme_dir,
 	     "--read-file",  $fastqfile,
 	     $opt->scheme,
-	     "$out_dir/$base");
+	     "$run_dir/$base");
 run_cmds(\@artic);
-	    
-rename("$out_dir/$base.consensus.fasta", "$out_dir/$base.fasta");
+
+rename("$run_dir/$base.consensus.fasta", "$run_dir/$base.fasta");
+
+if (!$opt->keep_intermediates)
+{
+    #
+    # We keep the generated fasta, bam, and vcf files.
+    #
+    opendir(D, $tmpdir) or die "Cannot opendir $tmpdir: $!";
+    while (my $f = readdir(D))
+    {
+	next if $f =~ /^$base.*\.nCoV-2019/;
+	if ($f eq "$base.fasta" ||
+	    $f =~ /minion\.log|\.bam|\.vcf\.gz/)
+	{
+	    move("$tmpdir/$f", "$out_dir/$f");
+	}
+    }
+}
+

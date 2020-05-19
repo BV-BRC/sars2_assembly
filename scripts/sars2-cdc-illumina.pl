@@ -20,6 +20,7 @@ use strict;
 use Getopt::Long::Descriptive;
 use Bio::P3::SARS2Assembly 'run_cmds';
 use File::Basename;
+use File::Temp;
 
 my($opt, $usage) = describe_options("%c %o read1 read2 output-base output-dir",
 				    ["threads|j=i" => "Number of threads to use", { default => 1 }],
@@ -38,14 +39,25 @@ my $out_dir = shift;
 
 my $reference = Bio::P3::SARS2Assembly::reference_fasta_path();
 
+my $int_dir;			# intermediate files
+
 -d $out_dir or mkdir($out_dir) or die "Cannot create $out_dir: $!";
 
-my $trim1 = "$out_dir/$base.trim.1.fastq";
-my $trim2 = "$out_dir/$base.trim.2.fastq";
+if ($opt->keep_intermediates)
+{
+    $int_dir = $out_dir;
+}
+else
+{
+    $int_dir = File::Temp->newdir(CLEANUP => 1);
+}
 
-my $samfile = "$out_dir/$base.sam";
+my $trim1 = "$int_dir/$base.trim.1.fastq";
+my $trim2 = "$int_dir/$base.trim.2.fastq";
+
+my $samfile = "$int_dir/$base.sam";
 my $bamfile = "$out_dir/$base.bam";
-my $vcf = "$out_dir/$base.sam";
+my $vcf = "$out_dir/$base.vcf";
 my $consensusfasta = "$out_dir/$base.fasta";
 
 my $threads = $opt->threads;
@@ -98,7 +110,7 @@ run_cmds(\@cutadapt1, '|', \@cutadapt2);
 my @bowtie = ("bowtie2",
 	      "--sensitive-local",
 	      "-p", $threads,
-	      "-x", $reference",
+	      "-x", $reference,
 	      "-1", $trim1,
 	      "-2", $trim2,
 	      "-S", $samfile);
@@ -134,6 +146,20 @@ run_cmds(\@con1, '|',
 	 \@con6, '|',
 	 \@con7, '>', $consensusfasta);
 
-	 
+#
+# Make sure any vcf files in the output folder are bgzipped/indexed.
+#
 
+for my $v (<$out_dir/*.vcf>)
+{
+    run_cmds(["bgzip", $v]);
+}
+
+for my $v (<$out_dir/*.vcf.gz>)
+{
+    if (! -f "$v.tbi")
+    {
+	run_cmds(["tabix", $v]);
+    }
+}
 
