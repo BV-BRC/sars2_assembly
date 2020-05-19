@@ -65,6 +65,7 @@ my $threads = $opt->threads;
 #
 # Adjust path to put the right version of tools in place.
 #
+$ENV{PATH} = "$ENV{KB_RUNTIME}/samtools-1.9/bin:$ENV{KB_RUNTIME}/bcftools-1.9/bin:$ENV{PATH}";
 $ENV{PATH} = "$ENV{KB_RUNTIME}/medaka/bin:$ENV{PATH}";
 
 #

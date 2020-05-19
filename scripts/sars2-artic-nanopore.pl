@@ -46,7 +46,8 @@ my $threads = $opt->threads;
 #
 # Adjust path to put the right version of tools in place.
 #
-$ENV{PATH} = "$ENV{KB_RUNTIME}/artic/bin:$ENV{PATH}";
+$ENV{PATH} = "$ENV{KB_RUNTIME}/samtools-1.9/bin:$ENV{KB_RUNTIME}/bcftools-1.9/bin:$ENV{PATH}";
+$ENV{PATH} = "$ENV{KB_RUNTIME}/artic-ncov2019/bin:$ENV{PATH}";
 
 #
 # If not running with keep-intermediates, We run writing to our temp space,
