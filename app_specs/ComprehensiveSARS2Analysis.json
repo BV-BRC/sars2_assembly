@@ -1,0 +1,310 @@
+{
+   "id" : "ComprehensiveSARS2Analysis",
+   "label" : "Comprehensive SARS2 Analysis",
+   "description" : "Analyze a genome from reads or contigs, generating a detailed analysis report.",
+  "default_memory": "100G",
+   "parameters" : [
+      #
+      # Common parameters
+      #
+      {
+         "desc" : "Input type (reads / contigs / genbank)",
+	 "required": 1,
+	 "default": null,
+	 "label": "Input Type",
+	 "type": "enum",
+	 "enum" : [ "reads", "contigs", "genbank" ],
+	 "id": "input_type"
+      },
+      {
+         "desc" : "Path to which the output will be written. Defaults to the directory containing the input data. ",
+         "required" : 1,
+         "default" : null,
+         "label" : "Output Folder",
+         "type" : "folder",
+         "id" : "output_path"
+      },
+      {
+         "required" : 1,
+         "desc" : "Basename for the generated output files. Defaults to the basename of the input data.",
+         "default" : null,
+         "label" : "File Basename",
+         "id" : "output_file",
+         "type" : "wsid"
+      },
+      #
+      # Assembly parameters
+      #
+    {
+      "id": "paired_end_libs",
+      "type": "group",
+      "allow_multiple": true,
+      "required": 0,
+      "default": null,
+      "group": [
+        {
+          "id": "read1",
+          "required": 1,
+          "label": "Read file 1",
+          "desc": "FASTQ file of reads",
+          "wstype": "ReadFile",
+          "type": "wstype"
+        },
+        {
+          "id": "read2",
+          "required": 0,
+          "label": "Read file 2",
+          "desc": "FASTQ file of reads",
+          "wstype": "ReadFile",
+          "type": "wstype"
+        },
+        {
+          "id": "platform",
+          "label": "Sequencing Platform",
+          "required": 0,
+          "default": "infer",
+          "desc": "Sequencing platform used to generate the read library",
+          "type": "enum",
+          "enum": [
+            "infer",
+            "illumina",
+            "pacbio",
+            "nanopore",
+            "iontorrent"
+          ]
+        },
+        {
+          "id": "interleaved",
+          "label": "Are the paired end reads interleaved?",
+          "required": false,
+          "default": false,
+          "type": "bool"
+        },
+        {
+          "id": "read_orientation_outward",
+          "label": "Do the two reads in each pair face outward?",
+          "required": false,
+          "default": false,
+          "type": "bool"
+        }
+      ]
+    },
+    {
+      "id": "single_end_libs",
+      "type": "group",
+      "allow_multiple": true,
+      "required": 0,
+      "default": null,
+      "group": [
+        {
+          "id": "read",
+          "required": 1,
+          "label": "Read file",
+          "desc": "FASTQ file of reads",
+          "wstype": "ReadFile",
+          "type": "wstype"
+        },
+        {
+          "id": "platform",
+          "label": "Sequencing Platform",
+          "required": 0,
+          "default": "infer",
+          "desc": "Sequencing platform used to generate the read library",
+          "type": "enum",
+          "enum": [
+            "infer",
+            "illumina",
+            "pacbio",
+            "nanopore",
+            "iontorrent"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "srr_ids",
+      "required": 0,
+      "allow_multiple": true,
+      "default": null,
+      "label": "SRR ID",
+      "desc": "Sequence Read Archive (SRA) Run ID",
+      "type": "string"
+    },
+    {
+      "id": "recipe",
+      "label": "Assembly recipe",
+      "required": 0,
+      "default": "auto",
+      "desc": "Recipe used for assembly",
+      "type": "enum",
+      "enum": [
+        "auto",
+	"cdc-illumina",
+	"cdc-nanopore",
+	"artic-nanopore"
+      ]
+    },
+    {
+      "id": "min_depth",
+      "label": "Minimum depth to add to consensus",
+      "required": 0,
+      "default": 100,
+      "desc": "Minimum coverage to add reads to consensus sequence",
+      "type": "int"
+    },
+    {
+      "id": "keep_intermediates",
+      "label": "Keep all intermediate output from the pipeline",
+      "required": 0,
+      "default": 0,
+      "desc": "Keep all intermediate output from the pipeline",
+      "type": "int"
+    },
+      #
+      # Annotation parameters. Exactly one of reads, contigs, or genbank file input is required.
+      #
+    {
+      "id": "genbank_file",
+      "required": 0,
+      "default": null,
+      "label": "Genbank file",
+      "desc": "Genome to process",
+      "wstype": "genbank_file",
+      "type": "wstype"
+       },
+      {
+         "label" : "Contig file",
+         "wstype" : "Contigs",
+         "type" : "wstype",
+         "id" : "contigs",
+         "required" : 0,
+         "desc" : "Input set of DNA contigs for annotation",
+         "default" : null
+      },
+      {
+         "desc" : "Scientific name of genome to be annotated",
+         "required" : 1,
+         "default" : null,
+         "label" : "Scientific Name",
+         "type" : "string",
+         "id" : "scientific_name"
+      },
+      {
+         "label" : "NCBI Taxonomy ID",
+         "type" : "int",
+         "id" : "taxonomy_id",
+         "required" : 1,
+         "desc" : "NCBI Taxonomy identfier for this genome",
+         "default" : null
+      },
+      {
+         "id" : "code",
+         "type" : "enum",
+         "label" : "Genetic Code",
+         "default" : 11,
+         "enum" : [
+            "11",
+            "4"
+         ],
+         "desc" : "Genetic code used in translation of DNA sequences",
+         "required" : 1
+      },
+      {
+         "id" : "domain",
+         "type" : "enum",
+         "label" : "Domain",
+         "default" : "Bacteria",
+         "enum" : [
+            "Bacteria",
+            "Archaea"
+         ],
+         "desc" : "Domain of the submitted genome",
+         "required" : 1
+      },
+      #
+      # Control parameters
+      #
+      {
+         "default" : false,
+         "desc" : "Make this genome public",
+         "required" : 0,
+         "id" : "public",
+         "type" : "bool",
+         "label" : "Public"
+      },
+      {
+         "desc" : "If set, don't wait for the indexing to finish before marking the job complete.",
+         "required" : 0,
+         "default" : false,
+         "label" : "Don't wait on indexing queue",
+         "type" : "bool",
+         "id" : "queue_nowait"
+      },
+      {
+         "id" : "skip_indexing",
+         "type" : "bool",
+         "label" : "Don't index genome",
+         "default" : false,
+         "required" : 0,
+         "desc" : "If set, don't index this genome in solr. It will not be available for analysis through the PATRIC site."
+      },
+      {
+         "desc" : "Reference genome ID",
+         "required" : 0,
+         "default" : null,
+         "label" : "Reference genome ID",
+         "type" : "string",
+         "id" : "reference_genome_id"
+      },
+    {
+      "id": "reference_virus_name",
+      "required": 0,
+      "default": null,
+      "label": "Reference virus name",
+      "desc": "Reference virus name",
+      "type": "string"
+    },
+    {
+      "id": "container_id",
+      "label": "(Internal) Container to use for this run",
+      "desc": "(Internal) Container to use for this run",
+      "required": 0,
+      "default": null,
+      "type": "string"
+    },
+      {
+         "label" : "(Internal) Parent job for this annotation",
+         "type" : "string",
+         "id" : "_parent_job",
+         "required" : 0,
+         "desc" : "(Internal) Parent job for this annotation",
+         "default" : null
+      },
+      {
+         "label" : "Custom workflow",
+         "id" : "workflow",
+         "type" : "string",
+         "desc" : "Specifies a custom workflow document (expert).",
+         "required" : 0,
+         "default" : null
+      },
+      {
+         "id" : "analyze_quality",
+         "type" : "bool",
+         "label" : "Enable quality analysis of genome",
+         "default" : null,
+         "required" : 0,
+         "desc" : "If enabled, run quality analysis on genome"
+      },
+    {
+      "id": "debug_level",
+      "label": "Debug level",
+      "required": 0,
+      "default": 0,
+      "desc": "Debugging level.",
+      "type": "int"
+    }
+
+   ],
+   "script" : "App-ComprehensiveSARS2Analysis"
+}

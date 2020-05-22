@@ -71,6 +71,14 @@ $ENV{PATH} = "$ENV{KB_RUNTIME}/samtools-1.9/bin:$ENV{KB_RUNTIME}/bcftools-1.9/bi
 # Step 1. Adapter trimming.
 #
 
+my $t1 = 1;
+my $t2 = 1;
+if ($threads > 1)
+{
+    $t1 = int($threads / 2);
+    $t2 = $t2 = $threads - $t1;
+}
+
 my @cutadapt1 = qw(cutadapt
 		  -g GTTTCCCAGTCACGATA
 		  -G GTTTCCCAGTCACGATA
@@ -84,7 +92,7 @@ my @cutadapt1 = qw(cutadapt
 		  -m 75
 		  -q 25);
 push(@cutadapt1,
-     "-j", $threads,
+     "-j", $t1,
      "--interleaved", $read1, $read2
      );
 
@@ -93,7 +101,7 @@ my @cutadapt2 = qw(cutadapt
 		   -m 75
 		   -u 30);
 push(@cutadapt2, 
-     "-j", $threads,
+     "-j", $t2,
      "-o", $trim1,
      "-p", $trim2,
      "-");

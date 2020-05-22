@@ -1,0 +1,13 @@
+{
+ "input_type": "reads",
+  "srr_ids": ["SRR10902284"],
+  "recipe": "auto",
+"scientific_name": "SARS2 test",
+"code": 1,
+"domain": "Viruses",
+  "output_path": "/olson@patricbrc.org/home/vtest",
+  "output_file": "SRR10902284-out2"
+}
+
+
+

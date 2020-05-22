@@ -8,14 +8,28 @@ use strict;
 use Module::Metadata;
 use IPC::Run 'run';
 use Data::Dumper;
+use JSON::XS;
+use File::Slurp;
 
 use base 'Exporter';
 
-our @EXPORT_OK = qw(reference_fasta_path primer_bedpe_path run_cmds);
+our @EXPORT_OK = qw(reference_fasta_path primer_bedpe_path run_cmds vigor_workflow);
 
 our $ReferenceFasta = "MN908947.fasta";
 our $PrimerBedpe = "SC2_200324.bedpe";
 our $ArticSchemes = "primer_schemes";
+our $VigorWorkflow = "vigor.wf";
+
+sub vigor_workflow
+{
+    my $mpath = Module::Metadata->find_module_by_name("Bio::P3::SARS2Assembly");
+    $mpath =~ s/\.pm$//;
+
+    my $ref = "$mpath/$VigorWorkflow";
+    my $txt = read_file($ref);
+    my $data = decode_json($txt);
+    return $data;
+}
 
 sub reference_fasta_path
 {
