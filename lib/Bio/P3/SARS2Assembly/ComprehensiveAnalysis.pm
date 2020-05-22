@@ -25,8 +25,7 @@ use Bio::P3::SARS2Assembly;
 use Bio::KBase::AppService::Client;
 use Bio::KBase::AppService::AppConfig qw(data_api_url binning_genome_annotation_clientgroup);
 use GenomeTypeObject;
-use Archive::Zip qw( :ERROR_CODES :CONSTANTS );
-use Archive::Zip::MemberRead;
+use Template;
 
 __PACKAGE__->mk_accessors(qw(app app_def params token
 			     output_base output_folder 
@@ -194,8 +193,8 @@ sub process_reads
 	print STDERR "inline assemble: @cmd\n";
 
 	my $start = time;
-	#my $rc = system(@cmd);
-	my $rc = 0;
+	my $rc = system(@cmd);
+	#my $rc = 0;
 	my $end = time;
 	if ($rc != 0)
 	{
@@ -328,7 +327,6 @@ sub process_contigs
 
 	my $start = time;
 	my $rc = system(@cmd);
-	# my $rc = system("bash", "-c", "source /vol/patric3/production/P3Slurm2/tst_deployment/user-env.sh; @cmd");
 	#my $rc = 0;
 	my $end = time;
 	if ($rc != 0)
@@ -422,6 +420,7 @@ sub generate_report
     # Download the generated genome object.
     #
     
+    my $assembly_folder = $self->output_folder . "/.assembly";
     my $anno_folder = $self->output_folder . "/.annotation";
     my $file = "annotation.genome";
     my $annotated_file = "annotation-with-stats.genome";
@@ -441,104 +440,34 @@ sub generate_report
     $gto->destroy_to_file($annotated_file);
 
     #
-    # For the circular viewer, we need the sp_gene load file.
-    #
-    my $sp_genes = "sp_gene.json";
-    eval {
-	$self->app->workspace->download_file("$anno_folder/load_files/$sp_genes", $sp_genes, 1, $self->token->token);
-    };
-
-    #
-    # Create the subsystem color map used in both the circular viewer and the report itself.
+    # Load vcf data
     #
 
-    my $ss_colors = "subsystem_colors.json";
-
-    my $rc = system("p3x-determine-subsystem-colors", "-o", $ss_colors, $annotated_file);
-    $rc == 0 or die "p3x-determine-subsystem-colors failed with rc=$rc";
-    
-    #
-    # Create circular viewer data.
-    #
-
-    my $stat_tmp = File::Temp->new;
-    close($stat_tmp);
-
-    my @cmd = ("p3x-generate-circos",
-	       "--truncate-small-contigs",
-	       "--truncate-small-contigs-threshold", 300,
-	       "--max-contigs", 500,
-	       "--truncation-status-file", "$stat_tmp",
-	       "--subsystem-colors", $ss_colors,
-	       (-s $sp_genes ? ("--specialty-genes", $sp_genes) : ()),
-	       "--output-png", "circos.png",
-	       "--output-svg", "circos.svg",
-	       $annotated_file);
-    $rc = system(@cmd);
-    $rc == 0 or die "Circos build failed with rc=$rc: @cmd";
-
-    my $n_contigs;
-    my $n_contigs_drawn;
-
-    my @circos_stat_param;
-
-    if (open(my $fh, "<", "$stat_tmp"))
+    my $vcf = "assembly.vcf.gz";
+    my $vcf_txt;
+    $self->app->workspace->download_file("$assembly_folder/$vcf", $vcf, 1, $self->token->token);
+    if (open(my $fh, "-|", "gzip", "-d", "-c", $vcf))
     {
-	my $l = <$fh>;
-	chomp $l;
-	print STDERR "p3x-generate-circos generated truncation statistics: '$l'\n";
-	if ($l =~ m,^(\d+)/(\d+),)
-	{
-	    $n_contigs_drawn = $1;
-	    $n_contigs = $2;
-	    @circos_stat_param = ("--n-contigs" => $n_contigs, "--n-contigs-drawn" => $n_contigs_drawn);
-	}
-    }
-    else
-    {
-	print STDERR "p3x-generate-circos did not generate truncation statistics\n";
+	local $/;
+	undef $/;
+
+	$vcf_txt = <$fh>;
+	close($fh);
     }
 
-    @cmd = ("create-report",
-	    "-i", $annotated_file,
-	    @circos_stat_param,
-	    "-o", "FullGenomeReport.html",
-	    "-c", "circos.svg",
-	    "-s", $ss_colors);
-    
-    my @trees_to_upload;
-    print STDERR "Creating report with command: @cmd\n";
+    my $templ = Template->new(ABSOLUTE => 1);
+    my %vars = (gto => $gto,
+		vcf_data => $vcf_txt,
+		);
+    $templ->process(Bio::P3::SARS2Assembly::report_template, \%vars, "FullGenomeReport.html") ||
+	die "Error processing template: " . $templ->error();
 
-    my $rc = system(@cmd);
-    if ($rc != 0)
-    {
-	warn "Failure rc=$rc creating genome report\n";
-    }
-    else
     {
 	my $ws = $self->app->workspace;
 	$ws->save_file_to_file("FullGenomeReport.html", {}, $report, 'html', 
 				   1, 1, $self->token->token) if -f "FullGenomeReport.html";
 	$ws->save_file_to_file($annotated_file, {}, $saved_genome, 'genome', 
 						 1, 1, $self->token->token);
-	$ws->save_file_to_file("circos.svg", {}, $self->output_folder . "/circos.svg", 'svg',
-			       1, 0, $self->token->token);
-	$ws->save_file_to_file("circos.png", {}, $self->output_folder . "/circos.png", 'png',
-			       1, 0, $self->token->token);
-	$ws->save_file_to_file($ss_colors, {}, $self->output_folder . "/$ss_colors", 'json',
-			       1, 0, $self->token->token) if -f $ss_colors;
-	for my $ent (@trees_to_upload)
-	{
-	    my($file, $type) = @$ent;
-	    #
-	    # write to lowercase so we don't obscure our full report, which is upper case
-	    # and is intended to lead the list.
-	    #
-	    my $base = lcfirst(basename($file));
-	    $ws->save_file_to_file($file, {}, $self->output_folder . "/$base", $type,
-			       1, 0, $self->token->token);
-	}
-
     }
     
 }

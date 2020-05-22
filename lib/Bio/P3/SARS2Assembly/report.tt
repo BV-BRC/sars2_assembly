@@ -1,0 +1,44 @@
+<title>SARS2 Assembly Report</title>
+<h1>SARS2 Assembly Report for [% gto.scientific_name %]</h1>
+
+[% IF gto.job_data.assembly -%]
+<h2>Assembly statistics</h2>
+<table border=1>
+<tr><td>Job ID</td><td>[% gto.job_data.assembly.job_id %]</td></tr>
+<tr><td>Elapsed time</td><td>[% gto.job_data.assembly.elapsed_time %] sec</td></tr>
+<tr><td>Recipe</td><td>[% gto.job_data.assembly.parameters.recipe %]</td></tr>
+</table>
+
+Variation data:
+<pre>
+[% vcf_data -%]
+</pre>
+
+[% END -%]
+
+<h2>Annotation statistics</h2>
+
+
+<table border=1>
+<tr><td>Job ID</td><td>[% gto.job_data.annotation.job_id %]</td></tr>
+<tr><td>Elapsed time</td><td>[% gto.job_data.annotation.elapsed_time %] sec</td></tr>
+</table>
+
+Features:
+<table border=1>
+<tr>
+<th>ID</th>
+<th>Start</th>
+<th>Strand</th>
+<th>Length</th>
+<th>Function</th>
+</tr>
+[% FOR f IN gto.features -%]
+<tr>
+<td>[% f.id %]</td>
+<td>[% f.location.0.1 %]</td>
+<td>[% f.location.0.2 %]</td>
+<td>[% f.location.0.3 %]</td>
+<td>[% f.function %]</td>
+[% END -%]
+</table>
