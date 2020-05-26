@@ -66,7 +66,8 @@ deploy-service-scripts:
 	        echo install $$src $$base ; \
 	        cp $$src $(TARGET)/plbin ; \
 	        $(WRAP_PERL_SCRIPT) "$(TARGET)/plbin/$$basefile" $(TARGET)/bin/$$base ; \
-	done
+	done 
+	mkdir -p $(TARGET)/services/$(APP_SERVICE)
 	rsync -arv app_specs $(TARGET)/services/$(APP_SERVICE)/.
 
 deploy-dir:
