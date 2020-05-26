@@ -54,6 +54,7 @@ lib/Bio/P3/SARS2Assembly/primer_schemes:
 deploy: deploy-all
 deploy-all: deploy-client 
 deploy-client: deploy-libs deploy-scripts deploy-docs
+deploy-service: deploy-dir deploy-service-scripts
 
 deploy-service-scripts:
 	export KB_TOP=$(TARGET); \
@@ -64,7 +65,7 @@ deploy-service-scripts:
 	        base=`basename $$src .pl`; \
 	        echo install $$src $$base ; \
 	        cp $$src $(TARGET)/plbin ; \
-	        $(WRAP_PERL_SCRIPT) "$(TARGET)/plbin/$$basefile" $(TARGET)/services/$(SERVICE)/bin/$$base ; \
+	        $(WRAP_PERL_SCRIPT) "$(TARGET)/plbin/$$basefile" $(TARGET)/bin/$$base ; \
 	done
 	rsync -arv app_specs $(TARGET)/services/$(APP_SERVICE)/.
 
