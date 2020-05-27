@@ -273,13 +273,13 @@ else
     my $task = eval { $app_service->start_app($app, $params, '') };
     if ($@)
     {
-	die "Error submitting annotation to service:\n$@\n";
+	die "Error submitting analysis to service:\n$@\n";
     }
     elsif (!$task)
     {
-	die "Error submitting annotation to service (unknown error)\n";
+	die "Error submitting analysis to service (unknown error)\n";
     }
-    print "Submitted assembly with id $task->{id}\n";
+    print "Submitted analysis with id $task->{id}\n";
 }
 
 sub format_size
