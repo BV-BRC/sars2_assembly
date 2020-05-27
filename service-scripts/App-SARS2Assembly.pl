@@ -140,7 +140,11 @@ sub determine_recipe
     $ok or die "Recipe $recipe is not valid (acceptable values are @$valid_recipes)";
 
     my $lib_type;
-    my $platform = $lib->{platform} // $lib->{metadata}->{platform_name};
+    my $platform = $lib->{platform};
+    if (!$platform || $platform eq 'infer')
+    {
+	$platform = $lib->{metadata}->{platform_name};
+    }
     if ($platform =~ /nanopore/i)
     {
 	$lib_type = 'nanopore';

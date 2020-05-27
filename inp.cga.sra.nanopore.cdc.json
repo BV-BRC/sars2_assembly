@@ -5,8 +5,10 @@
 "scientific_name": "SARS2 test",
 "code": 1,
 "domain": "Viruses",
+"taxonomy_id": 2697049,
   "output_path": "/olson@patricbrc.org/home/vtest",
-  "output_file": "SRR10902284-out2"
+  "output_file": "SRR10902284-out3",
+"container_id": "p3-build-52"
 }
 
 
