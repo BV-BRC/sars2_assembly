@@ -23,6 +23,7 @@ use File::Copy qw(move);
 use File::Temp;
 
 my($opt, $usage) = describe_options("%c %o reads output-base output-dir",
+				    ["output-name|n=s" => "Output name for sequence (in the fasta file). Defaults to output-base"],
 				    ["scheme=s" => "Artic scheme", { default => "nCoV-2019/V3" }],
 				    ["threads|j=i" => "Number of threads to use", { default => 1 }],
 				    ["keep-intermediates|k" => "Save all intermediate files"],
@@ -35,6 +36,11 @@ die($usage->text) unless @ARGV == 3;
 my $fastqfile = shift;
 my $base = shift;
 my $out_dir = shift;
+
+$base =~ m,/, and die "Output base may not have slash characters\n";
+
+my $output_name = $opt->output_name || $base;
+$output_name =~ s/\s+/_/g;
 
 my $scheme_dir = Bio::P3::SARS2Assembly::artic_primer_schemes_path();
 
@@ -66,7 +72,34 @@ my @artic = ("artic", "minion",
 	     "$run_dir/$base");
 run_cmds(\@artic);
 
-rename("$run_dir/$base.consensus.fasta", "$run_dir/$base.fasta");
+#
+# We need to rewrite the output name here.
+#
+
+open(RIN, "<", "$run_dir/$base.consensus.fasta") or die "Cannot open consensus $run_dir/$base.consensus.fasta: $!";
+open(ROUT, ">", "$run_dir/$base.fasta") or die "Cannot open output consensus $run_dir/$base.fasta: $!";
+{
+    my $seen;
+    while (<RIN>)
+    {
+	if (/^>/)
+	{
+	    if ($seen)
+	    {
+		die "unexpected multiple-contig reference found in $base.consensus.fasta";
+	    }
+	    $seen = 1;
+	    print ROUT ">$output_name\n";
+	}
+	else
+	{
+	    print ROUT $_;
+	}
+    }
+    close(RIN);
+    close(ROUT);
+    unlink("$run_dir/$base.consensus.fasta");
+}
 
 if (!$opt->keep_intermediates)
 {

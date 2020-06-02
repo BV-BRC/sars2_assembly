@@ -23,6 +23,7 @@ use File::Basename;
 use File::Temp;
 
 my($opt, $usage) = describe_options("%c %o reads output-base output-dir",
+				    ["output-name|n=s" => "Output name for sequence (in the fasta file). Defaults to output-base"],
 				    ["threads|j=i" => "Number of threads to use", { default => 1 }],
 				    ["keep-intermediates|k" => "Save all intermediate files"],
 				    ["help|h"      => "Show this help message"],
@@ -35,7 +36,12 @@ my $fastqfile = shift;
 my $base = shift;
 my $out_dir = shift;
 
-my $reference = Bio::P3::SARS2Assembly::reference_fasta_path();
+$base =~ m,/, and die "Output base may not have slash characters\n";
+
+my $output_name = $opt->output_name || $base;
+$output_name =~ s/\s+/_/g;
+
+my $reference_base = Bio::P3::SARS2Assembly::reference_fasta_path();
 my $primer = Bio::P3::SARS2Assembly::primer_bedpe_path();
 
 my $int_dir;			# intermediate files
@@ -50,6 +56,32 @@ else
 {
     $int_dir = File::Temp->newdir(CLEANUP => 1);
 }
+
+my $reference = "$int_dir/reference.fasta";
+open(RIN, "<", $reference_base) or die "Cannot open reference $reference_base: $!";
+open(ROUT, ">", $reference) or die "Cannot open reference $reference: $!";
+{
+    my $seen;
+    while (<RIN>)
+    {
+	if (/^>/)
+	{
+	    if ($seen)
+	    {
+		die "unexpected multiple-contig reference found in $reference_base";
+	    }
+	    $seen = 1;
+	    print ROUT ">$output_name\n";
+	}
+	else
+	{
+	    print ROUT $_;
+	}
+    }
+    close(RIN);
+    close(ROUT);
+}
+	
 
 my $fastqfiltered = "$int_dir/$base.filtered.fastq";
 

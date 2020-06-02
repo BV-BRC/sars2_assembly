@@ -23,6 +23,7 @@ use File::Basename;
 use File::Temp;
 
 my($opt, $usage) = describe_options("%c %o read1 read2 output-base output-dir",
+				    ["output-name|n=s" => "Output name for sequence (in the fasta file). Defaults to output-base"],
 				    ["threads|j=i" => "Number of threads to use", { default => 1 }],
 				    ["min-depth|d=i" => "Minimum depth required to call bases in consensus", { default => 100 }],
 				    ["keep-intermediates|k" => "Save all intermediate files"],
@@ -37,7 +38,12 @@ my $read2 = shift;
 my $base = shift;
 my $out_dir = shift;
 
-my $reference = Bio::P3::SARS2Assembly::reference_fasta_path();
+$base =~ m,/, and die "Output base may not have slash characters\n";
+
+my $output_name = $opt->output_name || $base;
+$output_name =~ s/\s+/_/g;
+
+my $reference_base = Bio::P3::SARS2Assembly::reference_fasta_path();
 
 my $int_dir;			# intermediate files
 
@@ -66,6 +72,32 @@ my $threads = $opt->threads;
 # Adjust path to put the right version of tools in place.
 #
 $ENV{PATH} = "$ENV{KB_RUNTIME}/samtools-1.9/bin:$ENV{KB_RUNTIME}/bcftools-1.9/bin:$ENV{PATH}";
+
+my $reference = "$int_dir/reference.fasta";
+open(RIN, "<", $reference_base) or die "Cannot open reference $reference_base: $!";
+open(ROUT, ">", $reference) or die "Cannot open reference $reference: $!";
+{
+    my $seen;
+    while (<RIN>)
+    {
+	if (/^>/)
+	{
+	    if ($seen)
+	    {
+		die "unexpected multiple-contig reference found in $reference_base";
+	    }
+	    $seen = 1;
+	    print ROUT ">$output_name\n";
+	}
+	else
+	{
+	    print ROUT $_;
+	}
+    }
+    close(RIN);
+    close(ROUT);
+    run_cmds(["bowtie2-build", $reference, $reference]);
+}
 
 #
 # Step 1. Adapter trimming.
@@ -111,9 +143,6 @@ run_cmds(\@cutadapt1, '|', \@cutadapt2);
 #
 # Step 2. Mapping with bowtie. 
 #
-
-# Build has been moved to the deploy
-#run_cmds(["bowtie2-build", $reference, $ref_local]);
 
 my @bowtie = ("bowtie2",
 	      "--sensitive-local",
