@@ -445,7 +445,9 @@ sub generate_report
 
     my $vcf = "assembly.vcf.gz";
     my $vcf_txt;
-    $self->app->workspace->download_file("$assembly_folder/$vcf", $vcf, 1, $self->token->token);
+    eval {
+	$self->app->workspace->download_file("$assembly_folder/$vcf", $vcf, 1, $self->token->token);
+    };
     if (open(my $fh, "-|", "gzip", "-d", "-c", $vcf))
     {
 	local $/;
