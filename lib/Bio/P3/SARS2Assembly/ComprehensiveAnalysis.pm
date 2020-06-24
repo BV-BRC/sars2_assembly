@@ -17,6 +17,7 @@ use POSIX;
 use strict;
 use File::Basename;
 use Data::Dumper;
+use MIME::Base64;
 use Cwd;
 use base 'Class::Accessor';
 use JSON::XS;
@@ -311,65 +312,108 @@ sub process_contigs
     #
     $annotation_input->{queue_nowait} = 1;
 
-    print "Annotate with " . Dumper($annotation_input);
+
+    #
+    # Download our contigs to do a check to ensure they are valid.
+    #
+
+    my $ws = $self->app->workspace;
+    my $temp = File::Temp->new();
+    $ws->copy_files_to_handles(1, $ws->{token}, [[$self->contigs, $temp]]);
+    close($temp);
+    my $fasta_size = 0;
+    if (open(T, "<", "$temp"))
+    {
+	while (my($id, $def, $seq) = read_next_fasta_seq(\*T))
+	{
+	    $fasta_size += length($seq);
+	    if (length($seq) == 0)
+	    {
+		warn "Empty sequence $id\n";
+	    }
+	}
+	close(T);
+    }
+    undef $temp;
 
     my $qtask;
-    if ($inline)
+
+    if ($fasta_size == 0)
     {
-	my $app_spec = $self->find_app_spec($annotation_app);
-	my $tmp = File::Temp->new();
-	print $tmp encode_json($annotation_input);
-	close($tmp);
-
-	my @cmd = ("App-$annotation_app", "xx", $app_spec, $tmp);
-	
-	print STDERR "inline annotate: @cmd\n";
-
 	my $start = time;
-	my $rc = system(@cmd);
-	#my $rc = 0;
-	my $end = time;
-	if ($rc != 0)
-	{
-	    die "Inline annotation failed with rc=$rc\n";
-	}
-
+	my $end = $start;
 	$qtask = {
 	    id => "annotation_$$",
-	    app => $annotation_app,
-	    parameters => $annotation_input,
+	    app => "none",
+	    parameters => "",
 	    user_id => $self->app->token()->user_id(),
 	    submit_time => strftime("%Y-%m-%dT%H:%M:%SZ", gmtime $start),
 	    start_time => strftime("%Y-%m-%dT%H:%M:%SZ", gmtime $start),
 	    completed_time => strftime("%Y-%m-%dT%H:%M:%SZ", gmtime $end),
-	};
+	    };
+	warn "Skipping annotation: zero length contigs\n";
     }
     else
     {
-	my $client = Bio::KBase::AppService::Client->new();
 	
-	my $task;
-	if ($ENV{CGA_DEBUG})
+	print "Annotate with " . Dumper($annotation_input);
+	
+	if ($inline)
 	{
-	    $task = {id => "0941e63f-7812-4602-98f2-858728e1e0d9"};
+	    my $app_spec = $self->find_app_spec($annotation_app);
+	    my $tmp = File::Temp->new();
+	    print $tmp encode_json($annotation_input);
+	    close($tmp);
+	    
+	    my @cmd = ("App-$annotation_app", "xx", $app_spec, $tmp);
+	    
+	    print STDERR "inline annotate: @cmd\n";
+	    
+	    my $start = time;
+	    my $rc = system(@cmd);
+	    #my $rc = 0;
+	    my $end = time;
+	    if ($rc != 0)
+	    {
+		die "Inline annotation failed with rc=$rc\n";
+	    }
+	    
+	    $qtask = {
+		id => "annotation_$$",
+		app => $annotation_app,
+		parameters => $annotation_input,
+		user_id => $self->app->token()->user_id(),
+		submit_time => strftime("%Y-%m-%dT%H:%M:%SZ", gmtime $start),
+		start_time => strftime("%Y-%m-%dT%H:%M:%SZ", gmtime $start),
+		completed_time => strftime("%Y-%m-%dT%H:%M:%SZ", gmtime $end),
+	    };
 	}
 	else
 	{
-	    $task = $client->start_app($annotation_app, $annotation_input, $self->output_folder);
-	}
-	
-	print "Created task " . Dumper($task);
-	
-	my $task_id = $task->{id};
-	$qtask = $self->await_task_completion($client, $task_id);
-	
-	if (!$qtask || $qtask->{status} ne 'completed')
-	{
-	    die "ComprehensiveGenomeAnalysis: process_reads failed\n";
+	    my $client = Bio::KBase::AppService::Client->new();
+	    
+	    my $task;
+	    if ($ENV{CGA_DEBUG})
+	    {
+		$task = {id => "0941e63f-7812-4602-98f2-858728e1e0d9"};
+	    }
+	    else
+	    {
+		$task = $client->start_app($annotation_app, $annotation_input, $self->output_folder);
+	    }
+	    
+	    print "Created task " . Dumper($task);
+	    
+	    my $task_id = $task->{id};
+	    $qtask = $self->await_task_completion($client, $task_id);
+	    
+	    if (!$qtask || $qtask->{status} ne 'completed')
+	    {
+		die "ComprehensiveGenomeAnalysis: process_reads failed\n";
+	    }
 	}
     }
-
-
+	
     #
     # Fill in annotation run stats for the genome object.
     #
@@ -386,6 +430,7 @@ sub process_contigs
 	    attributes => {
 	    },
 	    parameters => $qtask->{parameters},
+	    fasta_size => $fasta_size,
 	};
 	$self->annotation_statistics($stats);
     }
@@ -427,17 +472,33 @@ sub generate_report
     my $report = $self->output_folder . "/FullGenomeReport.html";
     my $saved_genome = $self->output_folder . "/annotated.genome";
 
-    $self->app->workspace->download_file("$anno_folder/$file", $file, 1, $self->token->token);
-
-    #
-    # Load the genome object, augment with the statistics, and write back out.
-    #
-    my $gto = GenomeTypeObject->new({file => $file});
-    $gto->{job_data} = {
-	assembly => $self->assembly_statistics,
-	annotation => $self->annotation_statistics,
+    eval {
+	$self->app->workspace->download_file("$anno_folder/$file", $file, 1, $self->token->token);
     };
-    $gto->destroy_to_file($annotated_file);
+
+    my $gto;
+    if (-s $file)
+    {
+	#
+	# Load the genome object, augment with the statistics, and write back out.
+	#
+	$gto = GenomeTypeObject->new({file => $file});
+	$gto->{job_data} = {
+	    assembly => $self->assembly_statistics,
+	    annotation => $self->annotation_statistics,
+	};
+	$gto->destroy_to_file($annotated_file);
+    }
+    else
+    {
+	# Create an empty genome object.
+	$gto = GenomeTypeObject->new();
+	$gto->{job_data} = {
+	    assembly => $self->assembly_statistics,
+	    annotation => $self->annotation_statistics,
+	};
+	$gto->destroy_to_file($annotated_file);
+    }
 
     #
     # Load vcf data
@@ -447,20 +508,37 @@ sub generate_report
     my $vcf_txt;
     eval {
 	$self->app->workspace->download_file("$assembly_folder/$vcf", $vcf, 1, $self->token->token);
+	if (open(my $fh, "-|", "gzip", "-d", "-c", $vcf))
+	{
+	    local $/;
+	    undef $/;
+	    
+	    $vcf_txt = <$fh>;
+	    close($fh);
+	}
     };
-    if (open(my $fh, "-|", "gzip", "-d", "-c", $vcf))
-    {
-	local $/;
-	undef $/;
-
-	$vcf_txt = <$fh>;
-	close($fh);
-    }
 
     my $templ = Template->new(ABSOLUTE => 1);
     my %vars = (gto => $gto,
 		vcf_data => $vcf_txt,
-		);
+	       );
+
+    eval {
+	$self->app->workspace->download_file("$assembly_folder/assembly.png", "assembly.png", 1, $self->token->token);
+	my $coverage = read_file("assembly.png");
+	if ($coverage)
+	{
+	    $vars{coverage_data} = encode_base64($coverage);
+	}
+	unlink("assembly.png");
+    };
+
+    my $assembly_details;
+    eval {
+	$assembly_details = $self->app->workspace->download_json("$assembly_folder/assembly-details.json", $self->token->token);
+    };
+    $vars{assembly_details} = $assembly_details;
+    
     $templ->process(Bio::P3::SARS2Assembly::report_template, \%vars, "FullGenomeReport.html") ||
 	die "Error processing template: " . $templ->error();
 

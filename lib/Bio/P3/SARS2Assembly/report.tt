@@ -1,4 +1,140 @@
+<html>
+<head>
 <title>SARS2 Assembly Report</title>
+
+<style>
+/* Home New Styles */
+@import url("https://fonts.googleapis.com/css?family=Didact+Gothic|Roboto");
+#patric-homepage {
+  color: #454545;
+  font-family: "Arial", Arial, Helvetica, sans-serif;
+}
+
+#patric-homepage h2 {
+  font-size: 20px;
+  font-family: "Roboto", Arial, Helvetica, sans-serif;
+  color: #454545;
+  font-weight: 700;
+  margin-bottom: 12px;
+}
+
+#patric-homepage h3 {
+  font-size: 18px;
+  font-family: "Roboto", Arial, Helvetica, sans-serif;
+  color: #454545;
+  font-weight: 700;
+  margin-bottom: 12px;
+}
+
+#patric-homepage p {
+  font-size: 14px;
+  font-family: "Didact Gothic", Arial, Helvetica, sans-serif;
+  color: #454545;
+}
+
+#patric-homepage ul {
+  list-style: none;
+  padding: 0;
+}
+
+#patric-homepage a {
+  color: #3E5775;
+  font-size: 14px;
+}
+
+#patric-homepage {
+  -webkit-box-sizing: border-box;
+          box-sizing: border-box;
+}
+
+@media (max-width: 991px) {
+  #patric-homepage #patric-homepage-container {
+    display: -webkit-box;
+    display: -ms-flexbox;
+    display: flex;
+    -webkit-box-pack: center;
+        -ms-flex-pack: center;
+            justify-content: center;
+    margin: 0 auto;
+    width: 830px;
+  }
+  #patric-homepage .grid-container {
+    display: grid;
+    grid-template-columns: 365px 365px;
+    grid-template-rows: 220px 375px 410px 220px;
+    grid-gap: 20px;
+  }
+  #patric-homepage .browse-search {
+    grid-column: 1 / 3;
+  }
+  #patric-homepage .analyze-data {
+    grid-column: 1 / 3;
+    grid-row: 2 / 3;
+  }
+  #patric-homepage .omics-data {
+    grid-column: 1 / 2;
+    grid-row: 4 / 5;
+  }
+  #patric-homepage .my-data {
+    grid-column: 2 / 3;
+    grid-row: 4 / 5;
+  }
+  #patric-homepage .announcements {
+    grid-column: 1 / 2;
+    grid-row: 3 / 4;
+  }
+  #patric-homepage .twitter-feed {
+    grid-column: 2 / 3;
+    grid-row: 3 / 4;
+  }
+}
+
+@media (min-width: 992px) {
+  #patric-homepage #patric-homepage-container {
+    display: -webkit-box;
+    display: -ms-flexbox;
+    display: flex;
+    -webkit-box-pack: center;
+        -ms-flex-pack: center;
+            justify-content: center;
+    margin: 0 auto;
+    width: 1300px;
+  }
+  #patric-homepage .grid-container {
+    display: grid;
+    grid-template-columns: 440px 440px 300px;
+    grid-template-rows: 225px 170px 170px 225px;
+    grid-gap: 20px;
+  }
+  #patric-homepage .browse-search {
+    grid-column: 1 / 3;
+  }
+  #patric-homepage .analyze-data {
+    grid-column: 1 / 3;
+    grid-row: 2 / 4;
+  }
+  #patric-homepage .omics-data {
+    grid-column: 1 / 2;
+  }
+  #patric-homepage .my-data {
+    grid-column: 2 / 3;
+  }
+  #patric-homepage .announcements {
+    grid-row: 1 / 3;
+  }
+  #patric-homepage .twitter-feed {
+    grid-row: 3 / 5;
+  }
+}
+
+#patric-homepage {
+  background: #F2F2F2;
+}
+</style>
+</head>
+<body id="patric-homepage">
+
+
 <h1>SARS2 Assembly Report for [% gto.scientific_name %]</h1>
 
 [% IF gto.job_data.assembly -%]
@@ -6,19 +142,34 @@
 <table border=1>
 <tr><td>Job ID</td><td>[% gto.job_data.assembly.job_id %]</td></tr>
 <tr><td>Elapsed time</td><td>[% gto.job_data.assembly.elapsed_time %] sec</td></tr>
-<tr><td>Recipe</td><td>[% gto.job_data.assembly.parameters.recipe %]</td></tr>
+<tr><td>User-selected Recipe</td><td>[% gto.job_data.assembly.parameters.recipe %]</td></tr>
+<tr><td>Platform</td><td>[% assembly_details.platform %]</td></tr>
+<tr><td>Library type</td><td>[% assembly_details.library_type %]</td></tr>
+<tr><td>Chosen recipe</td><td>[% assembly_details.recipe %]</td></tr>
+<tr><td>Number of Ns in assembly</td><td>[% assembly_details.total_ns %]</td></tr>
+<tr><td>Number of N blocks in assembly</td><td>[% assembly_details.n_blocks %]</td></tr>
+
 </table>
 
-Variation data:
+[% IF coverage_data -%]
+<h2>Coverage</h2>
+
+<p align="center">
+<img src="data:image/png;base64,[% coverage_data -%]"
+style="border-width: 2px; border-style: solid;"/>
+
+[% END -%]
+[% IF vcf_data -%]
+<h2>Variation data:</h2>
 <pre>
 [% vcf_data -%]
 </pre>
-
+[% END -%]
 [% END -%]
 
-<h2>Annotation statistics</h2>
-
-
+[% IF gto.job_data.annotation.fasta_size == 0 -%]
+No annotation was performed due to zero-length contig input.
+[% ELSE -%]
 <table border=1>
 <tr><td>Job ID</td><td>[% gto.job_data.annotation.job_id %]</td></tr>
 <tr><td>Elapsed time</td><td>[% gto.job_data.annotation.elapsed_time %] sec</td></tr>
@@ -42,3 +193,6 @@ Features:
 <td>[% f.function %]</td>
 [% END -%]
 </table>
+[% END -%]
+</body>
+</html>

@@ -41,6 +41,7 @@ use IPC::Run 'run';
 use POSIX;
 use File::Slurp;
 use JSON::XS;
+use gjoseqlib;
 
 use Bio::KBase::AppService::AppScript;
 use Bio::KBase::AppService::ReadSet;
@@ -100,7 +101,7 @@ sub preflight
 	die "Reads as defined in parameters failed to validate. Errors:\n\t" . join("\n\t", @$errs);
     }
 
-    my $recipe = determine_recipe($app_def, $params, $readset);
+    my($recipe, $details) = determine_recipe($app_def, $params, $readset);
 
     print STDERR "comp=$comp_size uncomp=$uncomp_size recipe=$recipe\n";
 
@@ -131,6 +132,8 @@ sub determine_recipe
     }
     my $lib = @libs[0];
 
+    my $details = {};
+
     my($recipe_def) = grep { $_->{id} eq 'recipe' } @{$app_def->{parameters}};
     my $valid_recipes = $recipe_def->{enum};
 
@@ -145,7 +148,12 @@ sub determine_recipe
     {
 	$platform = $lib->{metadata}->{platform_name};
     }
+    
     if ($platform =~ /nanopore/i)
+    {
+	$lib_type = 'nanopore';
+    }
+    elsif ($platform =~ /ion([_\s])*torrent/i)
     {
 	$lib_type = 'nanopore';
     }
@@ -166,7 +174,12 @@ sub determine_recipe
     {
 	die "Recipe $recipe is not valid for platform $platform";
     }
-    return $recipe;
+
+    $details->{platform} = $platform;
+    $details->{library_type}  = $lib_type;
+    $details->{recipe} = $recipe;
+
+    return ($recipe, $details);
 }
 
 sub assemble
@@ -202,7 +215,7 @@ sub assemble
 
     $readset->stage_in($ws);
 
-    my $recipe = determine_recipe($app_def, $params, $readset);
+    my($recipe, $details) = determine_recipe($app_def, $params, $readset);
 
     #
     # If we are running under Slurm, pick up our memory and CPU limits.
@@ -240,11 +253,36 @@ sub assemble
 
     my $output_folder = $app->result_folder();
 
+    #
+    # Read the fasta to get some counts.
+    #
+    if (open(CTG, "<", "$asm_out/$params->{output_file}.fasta"))
+    {
+	my $nblocks;
+	my $ncount;
+	while (my($id, $def, $seq) = read_next_fasta_seq(\*CTG))
+	{
+	    while ($seq =~ /([nN]+)/g)
+	    {
+		$nblocks++;
+		$ncount += length($1);
+	    }
+	}
+	close(CTG);
+	$details->{total_ns} = $ncount;
+	$details->{n_blocks} = $nblocks;
+    }
+
+    open(DETAILS, ">", "$asm_out/assembly-details.json");
+    print DETAILS JSON::XS->new->pretty(1)->encode($details);
+    close(DETAILS);
+
     my $type_map = {
 	bam => "bam",
 	vcf => "vcf",
 	'vcf.gz' => "vcf",
 	html => "html",
+	png => "png",
 	fasta => "contigs",
 	run_details => 'txt',
 	txt => 'txt',
@@ -252,6 +290,7 @@ sub assemble
 	stdout => "txt",
 	stderr => "txt",
 	jpg => 'jpg',
+	json => 'json',
     };
 
     my $save_path = $asm_out;
