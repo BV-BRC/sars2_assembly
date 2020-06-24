@@ -1,6 +1,6 @@
 <html>
 <head>
-<title>SARS2 Assembly Report</title>
+<title>SARS2 Assembly and Annotation Report</title>
 
 <style>
 /* Home New Styles */
@@ -167,6 +167,8 @@ style="border-width: 2px; border-style: solid;"/>
 [% END -%]
 [% END -%]
 
+<h1>SARS2 Annotation Report for [% gto.scientific_name %]</h1>
+
 [% IF gto.job_data.annotation.fasta_size == 0 -%]
 No annotation was performed due to zero-length contig input.
 [% ELSE -%]
@@ -175,7 +177,13 @@ No annotation was performed due to zero-length contig input.
 <tr><td>Elapsed time</td><td>[% gto.job_data.annotation.elapsed_time %] sec</td></tr>
 </table>
 
-Features:
+<p>
+
+[% IF gto.features.size == 0 -%]
+No features were found.
+[% ELSE -%]
+<h2>Features annotated:</h2>
+<p>
 <table border=1>
 <tr>
 <th>ID</th>
@@ -193,6 +201,7 @@ Features:
 <td>[% f.function %]</td>
 [% END -%]
 </table>
+[% END -%]
 [% END -%]
 </body>
 </html>
