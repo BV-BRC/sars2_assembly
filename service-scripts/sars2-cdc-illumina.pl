@@ -205,8 +205,12 @@ for my $v (<$out_dir/*.vcf.gz>)
 #
 
 run_cmds(["samtools", "depth", $bamfile], '>', "$out_dir/$base.depth");
-$ENV{GDFONTPATH} = "/usr/share/fonts/liberation";
-my $plot = <<END;
+
+if (-s "$out_dir/$base.depth")
+{
+    eval {
+	$ENV{GDFONTPATH} = "/usr/share/fonts/liberation";
+	my $plot = <<END;
 set term png font "LiberationSans-Regular"
 set xlabel "Position"
 set ylabel "Depth"
@@ -215,4 +219,7 @@ set output "$out_dir/$base.png"
 plot "$out_dir/$base.depth" using 2:3 with impulses title ""
 set output
 END
-run_cmds(["gnuplot"], "<", \$plot);
+    run_cmds(["gnuplot"], "<", \$plot);
+    };
+}
+
