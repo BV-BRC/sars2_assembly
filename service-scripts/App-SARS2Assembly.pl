@@ -37,6 +37,7 @@ use Carp;
 use Data::Dumper;
 use File::Temp;
 use File::Basename;
+use IO::Handle;
 use IPC::Run 'run';
 use POSIX;
 use File::Slurp;
@@ -101,7 +102,7 @@ sub preflight
 	die "Reads as defined in parameters failed to validate. Errors:\n\t" . join("\n\t", @$errs);
     }
 
-    my($recipe, $details) = determine_recipe($app_def, $params, $readset);
+    my($recipe, $details) = determine_recipe($app_def, $ws, $params, $readset);
 
     print STDERR "comp=$comp_size uncomp=$uncomp_size recipe=$recipe\n";
 
@@ -123,7 +124,7 @@ sub preflight
 
 sub determine_recipe
 {
-    my($app_def, $params, $readset) = @_;
+    my($app_def, $ws, $params, $readset) = @_;
 
     my @libs = grep { ! $_->{derived_from} } $readset->libraries;
     if (@libs > 1)
@@ -163,7 +164,20 @@ sub determine_recipe
     }
     elsif ($recipe eq 'auto')
     {
-	die "Unknown platform $platform and auto recipe requested";
+	my $is_pe = $lib->is_paired_end();
+	if (defined($is_pe) && $is_pe)
+	{
+	    warn "Defaulting unknown paired end library to illumina\n";
+	    $lib_type = 'illumina';
+	}
+	else
+	{
+	    $lib_type = guess_lib_type($ws, $lib);
+	    if (!$lib_type)
+	    {
+		die "Unknown platform $platform and auto recipe requested; could not guess library type";
+	    }
+	}
     }
 
     if ($recipe eq 'auto')
@@ -182,6 +196,90 @@ sub determine_recipe
     return ($recipe, $details);
 }
 
+sub guess_lib_type
+{
+    my($ws, $lib) = @_;
+
+    #
+    # We're only guessing for single ended libs.
+    #
+    if (!$lib->is_single_end())
+    {
+	warn "Can only guess for SE libs\n";
+	return undef;
+    }
+
+    my $shock;
+    eval {
+	my $path = $lib->{read_file};
+	
+	my $info = $ws->get({objects => [$path], metadata_only => 1});
+	my $obj = $info->[0];
+	my($meta) = @$obj;
+	$shock = $meta->[11];
+    };
+    if (!$shock)
+    {
+	warn "Error determining file type: $@";
+	return undef;
+    }
+
+    my $buf = $ws->shock_read_bytes($shock, 0, 1000000);
+    my %comp_map = ("\x1f\x8b" => 'gunzip',
+		    "BZ" => 'bunzip2');
+
+    my $comp = $comp_map{substr($buf, 0, 2)};
+    my $temp;
+    my $fh;
+    if ($comp)
+    {
+	$temp = File::Temp->new();
+	$fh  = new IO::Handle;
+	run([$comp], '<', \$buf, '>', "$temp");
+	close($temp);
+	open($fh, "<", $temp);
+    }
+    else
+    {
+	open($fh, "<", \$buf);
+    }
+    my $n_reads = 0;
+    my $total_len = 0;
+    my $max = 0;
+    while (<$fh>)
+    {
+	my $h1 = $_;
+	my $dat = <$fh>;
+	my $h2 = <$fh>;
+	my $q = <$fh>;
+	if (!defined($q))
+	{
+	    # we hit eof in the middle of a record and that's fine.
+	    last;
+	}
+	if ($h1 !~ /^@/ || $h2 !~ /^\+/)
+	{
+	    warn "Invalid FQ data\n";
+	    return undef;
+	}
+	$n_reads++;
+	my $l = length($dat);
+	$max = $l if $max < $l;
+	$total_len += $l;
+    }
+    close($fh);
+    my $avg = $total_len / $n_reads;
+    print "total=$total_len n_reads=$n_reads max=$max avg=$avg\n";
+    if ($max < 600)
+    {
+	return 'illumina';
+    }
+    else
+    {
+	return 'nanopore';
+    }
+      
+}
 sub assemble
 {
     my($app, $app_def, $raw_params, $params) = @_;
@@ -215,7 +313,7 @@ sub assemble
 
     $readset->stage_in($ws);
 
-    my($recipe, $details) = determine_recipe($app_def, $params, $readset);
+    my($recipe, $details) = determine_recipe($app_def, $ws, $params, $readset);
 
     #
     # If we are running under Slurm, pick up our memory and CPU limits.
