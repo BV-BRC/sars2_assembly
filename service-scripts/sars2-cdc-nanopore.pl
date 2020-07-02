@@ -195,6 +195,9 @@ for my $v (<$out_dir/*.vcf.gz>)
 # Create coverage plot
 #
 
+run_cmds(["samtools", "depth", $primerclippedbamfile], '>', "$out_dir/$base.depth");
+
+
 if (-s "$out_dir/$base.depth")
 {
     eval {
