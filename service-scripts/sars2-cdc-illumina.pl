@@ -64,6 +64,7 @@ my $trim2 = "$int_dir/$base.trim.2.fastq";
 my $samfile = "$int_dir/$base.sam";
 my $bamfile = "$out_dir/$base.bam";
 my $vcf = "$out_dir/$base.vcf";
+my $vcf2 = "$out_dir/variants.vcf";
 my $consensusfasta = "$out_dir/$base.fasta";
 
 my $threads = $opt->threads;
@@ -199,6 +200,12 @@ for my $v (<$out_dir/*.vcf.gz>)
 	run_cmds(["tabix", $v]);
     }
 }
+
+my $filter_params = "N_ALT == 0";
+my @con1 = ( "bcftools", "filter", "-e", $filter_params, "$vcf.gz");
+my @con2 = ("bgzip","-c");
+run_cmds(\@con1, '|',
+	\@con2, '>', "$vcf2.gz");
 
 #
 # Create coverage plot

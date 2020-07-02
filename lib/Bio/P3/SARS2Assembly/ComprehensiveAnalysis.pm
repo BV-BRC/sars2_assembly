@@ -505,10 +505,14 @@ sub generate_report
     #
 
     my $vcf = "assembly.vcf.gz";
+    my $vcf2 = "variants.vcf.gz";
     my $vcf_txt;
     eval {
-	$self->app->workspace->download_file("$assembly_folder/$vcf", $vcf, 1, $self->token->token);
-	if (open(my $fh, "-|", "gzip", "-d", "-c", $vcf))
+	$self->app->workspace->download_file("$assembly_folder/$vcf", $vcf2, 1, $self->token->token);
+	$self->app->workspace->download_file("$assembly_folder/$vcf2", $vcf2, 1, $self->token->token);
+    };
+    eval {
+	if (open(my $fh, "-|", "gzip", "-d", "-c", $vcf2))
 	{
 	    local $/;
 	    undef $/;
