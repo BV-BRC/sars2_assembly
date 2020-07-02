@@ -523,6 +523,9 @@ sub generate_report
 	    
 	    $vcf_txt = <$fh>;
 	    close($fh);
+
+	    $vcf_txt =~ s/</&lt;/g;
+	    $vcf_txt =~ s/>/&gt;/g;
 	}
     };
 
