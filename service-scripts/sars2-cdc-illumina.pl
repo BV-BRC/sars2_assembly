@@ -5,7 +5,8 @@
     
 =head1 SYNOPSIS
 
-    sars2-cdc-illumina read1 read2 output-base output-dir
+    sars2-cdc-illumina PE-read1 PE-read2 output-base output-dir
+    sars2-cdc-illumina SE-read output-base output-dir
 
 =head1 DESCRIPTION
 
@@ -22,7 +23,7 @@ use Bio::P3::SARS2Assembly 'run_cmds';
 use File::Basename;
 use File::Temp;
 
-my($opt, $usage) = describe_options("%c %o read1 read2 output-base output-dir",
+my($opt, $usage) = describe_options("%c %o read1 [read2] output-base output-dir",
 				    ["output-name|n=s" => "Output name for sequence (in the fasta file). Defaults to output-base"],
 				    ["threads|j=i" => "Number of threads to use", { default => 1 }],
 				    ["min-depth|d=i" => "Minimum depth required to call bases in consensus", { default => 100 }],
@@ -31,10 +32,28 @@ my($opt, $usage) = describe_options("%c %o read1 read2 output-base output-dir",
 				    );
 
 print($usage->text), exit 0 if $opt->help;
-die($usage->text) unless @ARGV == 4;
+die($usage->text) unless @ARGV == 3 || @ARGV == 4;
 
-my $read1 = shift;
-my $read2 = shift;
+my $mode;
+
+my($se_read, $pe_read_1, $pe_read_2);
+
+if (@ARGV == 3)
+{
+    $mode = "SE";
+    $se_read  = shift;
+}
+elsif (@ARGV == 4)
+{
+    $mode = "PE";
+    $pe_read_1 = shift;
+    $pe_read_2 = shift;
+}
+else
+{
+    die $usage->text;
+}
+
 my $base = shift;
 my $out_dir = shift;
 
@@ -57,9 +76,6 @@ else
 {
     $int_dir = File::Temp->newdir(CLEANUP => 1);
 }
-
-my $trim1 = "$int_dir/$base.trim.1.fastq";
-my $trim2 = "$int_dir/$base.trim.2.fastq";
 
 my $samfile = "$int_dir/$base.sam";
 my $bamfile = "$out_dir/$base.bam";
@@ -101,59 +117,105 @@ open(ROUT, ">", $reference) or die "Cannot open reference $reference: $!";
 }
 
 #
-# Step 1. Adapter trimming.
+# Paired end and single end differ at the start. Single end mode is adapted from the
+# CDC protocol.
 #
 
-my $t1 = 1;
-my $t2 = 1;
-if ($threads > 1)
+if ($mode eq 'PE')
 {
-    $t1 = int($threads / 2);
-    $t2 = $t2 = $threads - $t1;
+    #
+    # Step 1. Adapter trimming.
+    #
+    
+    my $trim1 = "$int_dir/$base.trim.1.fastq";
+    my $trim2 = "$int_dir/$base.trim.2.fastq";
+    
+    my $t1 = 1;
+    my $t2 = 1;
+    if ($threads > 1)
+    {
+	$t1 = int($threads / 2);
+	$t2 = $t2 = $threads - $t1;
+    }
+    
+    my @cutadapt1 = qw(cutadapt
+		       -g GTTTCCCAGTCACGATA
+		       -G GTTTCCCAGTCACGATA
+		       -a TATCGTGACTGGGAAAC
+		       -A TATCGTGACTGGGAAAC
+		       -g ACACTCTTTCCCTACACGACGCTCTTCCGATCT 
+		       -G ACACTCTTTCCCTACACGACGCTCTTCCGATCT
+		       -a AGATCGGAAGAGCACACGTCTGAACTCCAGTCA
+		       -A AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT
+		       -n 3
+		       -m 75
+		       -q 25);
+    push(@cutadapt1,
+	 "-j", $t1,
+	 "--interleaved", $pe_read_1, $pe_read_2
+	);
+    
+    my @cutadapt2 = qw(cutadapt
+		       --interleaved
+		       -m 75
+		       -u 30);
+    push(@cutadapt2, 
+	 "-j", $t2,
+	 "-o", $trim1,
+	 "-p", $trim2,
+	 "-");
+    
+    run_cmds(\@cutadapt1, '|', \@cutadapt2);
+    
+    #
+    # Step 2. Mapping with bowtie. 
+    #
+    
+    my @bowtie = ("bowtie2",
+		  "--sensitive-local",
+		  "-p", $threads,
+		  "-x", $reference,
+		  "-1", $trim1,
+		  "-2", $trim2,
+		  "-S", $samfile);
+    run_cmds(\@bowtie);
 }
-
-my @cutadapt1 = qw(cutadapt
+elsif ($mode eq 'SE')
+{
+    #
+    # Step 1. Adapter trimming.
+    #
+    
+    my $trim = "$int_dir/$base.trim.fastq";
+    
+    my @cutadapt = qw(cutadapt
 		  -g GTTTCCCAGTCACGATA
-		  -G GTTTCCCAGTCACGATA
 		  -a TATCGTGACTGGGAAAC
-		  -A TATCGTGACTGGGAAAC
 		  -g ACACTCTTTCCCTACACGACGCTCTTCCGATCT 
-		  -G ACACTCTTTCCCTACACGACGCTCTTCCGATCT
 		  -a AGATCGGAAGAGCACACGTCTGAACTCCAGTCA
-		  -A AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT
 		  -n 3
 		  -m 75
 		  -q 25);
-push(@cutadapt1,
-     "-j", $t1,
-     "--interleaved", $read1, $read2
-     );
+    push(@cutadapt,
+	 "-j", $threads,
+	 $se_read, "-o", $trim
+	);
 
-my @cutadapt2 = qw(cutadapt
-		   --interleaved
-		   -m 75
-		   -u 30);
-push(@cutadapt2, 
-     "-j", $t2,
-     "-o", $trim1,
-     "-p", $trim2,
-     "-");
-
-run_cmds(\@cutadapt1, '|', \@cutadapt2);
-
-#
-# Step 2. Mapping with bowtie. 
-#
-
-my @bowtie = ("bowtie2",
+    run_cmds(\@cutadapt);
+    
+    #
+    # Step 2. Mapping with bowtie. 
+    #
+    
+    my @bowtie = ("bowtie2",
 	      "--sensitive-local",
 	      "-p", $threads,
 	      "-x", $reference,
-	      "-1", $trim1,
-	      "-2", $trim2,
+	      "-U", $trim,
 	      "-S", $samfile);
-run_cmds(\@bowtie);
-
+    run_cmds(\@bowtie);
+}
+   
 #
 # Create bam format output
 #
