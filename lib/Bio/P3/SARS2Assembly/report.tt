@@ -159,11 +159,29 @@
 style="border-width: 2px; border-style: solid;"/>
 
 [% END -%]
+[% IF vcf_tabular -%]
+<h2>Variation data:</h2>
+<table>
+<tr>
+[% FOR k IN vcf_tabular.0 -%]
+<th>[% k %]</th>
+[% END -%]
+</tr>
+[% FOR row IN vcf_tabular.slice(1) -%]
+<tr>
+[% FOR v IN row -%]
+<td>[% v %]</td>
+[% END -%]
+</tr>
+[% END -%]
+</table>
+[% ELSE -%]
 [% IF vcf_data -%]
 <h2>Variation data:</h2>
 <pre>
 [% vcf_data -%]
 </pre>
+[% END -%]
 [% END -%]
 [% END -%]
 

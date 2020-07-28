@@ -508,6 +508,7 @@ sub generate_report
     my $vcf2 = "variants.vcf.gz";
     my $use_vcf = $vcf;
     my $vcf_txt = "";
+    my @vcf_tabular;
     eval {
 	$self->app->workspace->download_file("$assembly_folder/$vcf", $vcf, 1, $self->token->token);
 	$self->app->workspace->download_file("$assembly_folder/$vcf2", $vcf2, 1, $self->token->token);
@@ -525,6 +526,9 @@ sub generate_report
 		s/</&lt;/g;
 		s/>/&gt;/g;
 		$vcf_txt .= $_;
+
+		chomp;
+		push(@vcf_tabular, [split(/\t/, $_)]);
 	    }
 	    close($fh);
 	}
@@ -533,6 +537,7 @@ sub generate_report
     my $templ = Template->new(ABSOLUTE => 1);
     my %vars = (gto => $gto,
 		vcf_data => $vcf_txt,
+		vcf_tabular => \@vcf_tabular,
 	       );
 
     eval {
