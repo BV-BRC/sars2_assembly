@@ -377,7 +377,11 @@ sub assemble
 
     my $type_map = {
 	bam => "bam",
+	bai => "bai",
+	tbi => "tbi",
+	csi => "csi",
 	vcf => "vcf",
+	hdf => "hdf",
 	'vcf.gz' => "vcf",
 	html => "html",
 	png => "png",
