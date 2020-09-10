@@ -35,9 +35,12 @@ bin: $(BIN_PERL) $(BIN_SERVICE_PERL)
 
 reference: lib/Bio/P3/SARS2Assembly/MN908947.fasta.fai
 
+#
+# We allow failures on these since we do not have this tooling in the Mac CLI build.
+#
 lib/Bio/P3/SARS2Assembly/MN908947.fasta.fai: lib/Bio/P3/SARS2Assembly/MN908947.fasta
-	bowtie2-build  lib/Bio/P3/SARS2Assembly/MN908947.fasta lib/Bio/P3/SARS2Assembly/MN908947.fasta
-	$(KB_RUNTIME)/samtools-1.9/bin/samtools faidx lib/Bio/P3/SARS2Assembly/MN908947.fasta
+	-bowtie2-build  lib/Bio/P3/SARS2Assembly/MN908947.fasta lib/Bio/P3/SARS2Assembly/MN908947.fasta
+	-$(KB_RUNTIME)/samtools-1.9/bin/samtools faidx lib/Bio/P3/SARS2Assembly/MN908947.fasta
 
 primer: lib/Bio/P3/SARS2Assembly/SC2_200324.bedpe
 
