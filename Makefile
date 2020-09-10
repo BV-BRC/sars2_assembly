@@ -46,9 +46,14 @@ lib/Bio/P3/SARS2Assembly/SC2_200324.bedpe:
 
 artic_schemes: lib/Bio/P3/SARS2Assembly/primer_schemes
 
+#
+# The latest artic code makes breaking changes not yet synced with their SOP.
+# Stick to the working version.
+#
 lib/Bio/P3/SARS2Assembly/primer_schemes:
 	rm -rf artic-ncov2019
 	git clone https://github.com/artic-network/artic-ncov2019.git
+	git checkout 335ead0d7cdb4544c17c9dd51491c531878a91cf
 	cp -r artic-ncov2019/primer_schemes lib/Bio/P3/SARS2Assembly
 
 deploy: deploy-all
