@@ -25,6 +25,7 @@ use File::Temp;
 my($opt, $usage) = describe_options("%c %o reads output-base output-dir",
 				    ["output-name|n=s" => "Output name for sequence (in the fasta file). Defaults to output-base"],
 				    ["threads|j=i" => "Number of threads to use", { default => 1 }],
+				    ["min-depth|d=i" => "Minimum depth required to call bases in consensus", { default => 3 }],
 				    ["keep-intermediates|k" => "Save all intermediate files"],
 				    ["help|h"      => "Show this help message"],
 				    );
@@ -170,7 +171,7 @@ my @mask = ('vcf_mask_lowcoverage.pl',
 	    "--vcf", $vcf,
 	    "--refout", "$out_dir/$base.reference.masked.fasta",
 	    "--consout", $consensusfasta,
-	    "--depth", 20,
+	    "--depth", $opt->min_depth,
 	    "--qual", 40);
 run_cmds(\@mask);
 

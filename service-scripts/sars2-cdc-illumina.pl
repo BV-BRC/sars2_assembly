@@ -27,6 +27,7 @@ my($opt, $usage) = describe_options("%c %o read1 [read2] output-base output-dir"
 				    ["output-name|n=s" => "Output name for sequence (in the fasta file). Defaults to output-base"],
 				    ["threads|j=i" => "Number of threads to use", { default => 1 }],
 				    ["min-depth|d=i" => "Minimum depth required to call bases in consensus", { default => 100 }],
+				    ["minimum-read-length=i" => "Set a minimum read length to use for assembly"],
 				    ["keep-intermediates|k" => "Save all intermediate files"],
 				    ["help|h"      => "Show this help message"],
 				    );
@@ -148,21 +149,23 @@ if ($mode eq 'PE')
 		       -a AGATCGGAAGAGCACACGTCTGAACTCCAGTCA
 		       -A AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT
 		       -n 3
-		       -m 75
 		       -q 25);
+
+    my @min_rl = ("-m", $opt->minimum_read_length) if $opt->minimum_read_length;
     push(@cutadapt1,
 	 "-j", $t1,
-	 "--interleaved", $pe_read_1, $pe_read_2
+	 "--interleaved", $pe_read_1, $pe_read_2,
+	 @min_rl,
 	);
     
     my @cutadapt2 = qw(cutadapt
 		       --interleaved
-		       -m 75
 		       -u 30);
     push(@cutadapt2, 
 	 "-j", $t2,
 	 "-o", $trim1,
 	 "-p", $trim2,
+	 @min_rl,
 	 "-");
     
     run_cmds(\@cutadapt1, '|', \@cutadapt2);
@@ -194,11 +197,11 @@ elsif ($mode eq 'SE')
 		  -g ACACTCTTTCCCTACACGACGCTCTTCCGATCT 
 		  -a AGATCGGAAGAGCACACGTCTGAACTCCAGTCA
 		  -n 3
-		  -m 75
 		  -q 25);
     push(@cutadapt,
 	 "-j", $threads,
-	 $se_read, "-o", $trim
+	 $se_read, "-o", $trim,
+	 @min_rl,
 	);
 
     run_cmds(\@cutadapt);
