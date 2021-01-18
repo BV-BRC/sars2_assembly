@@ -122,6 +122,8 @@ open(ROUT, ">", $reference) or die "Cannot open reference $reference: $!";
 # CDC protocol.
 #
 
+my @min_rl = ("-m", $opt->minimum_read_length) if $opt->minimum_read_length;
+
 if ($mode eq 'PE')
 {
     #
@@ -151,7 +153,6 @@ if ($mode eq 'PE')
 		       -n 3
 		       -q 25);
 
-    my @min_rl = ("-m", $opt->minimum_read_length) if $opt->minimum_read_length;
     push(@cutadapt1,
 	 "-j", $t1,
 	 "--interleaved", $pe_read_1, $pe_read_2,
@@ -293,5 +294,22 @@ set output
 END
     run_cmds(["gnuplot"], "<", \$plot);
     };
+
+    eval {
+	$ENV{GDFONTPATH} = "/usr/share/fonts/liberation";
+	my $plot = <<END;
+set term png font "LiberationSans-Regular"
+set yrange [0:250]
+set xlabel "Position"
+set ylabel "Depth"
+set title "Coverage depth for $base"
+set output "$out_dir/$base.detail.png"
+plot "$out_dir/$base.depth" using 2:3 with impulses title ""
+set output
+END
+    run_cmds(["gnuplot"], "<", \$plot);
+    };
+
+
 }
 
