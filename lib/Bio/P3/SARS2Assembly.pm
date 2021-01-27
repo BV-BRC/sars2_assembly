@@ -13,9 +13,12 @@ use File::Slurp;
 
 use base 'Exporter';
 
-our @EXPORT_OK = qw(reference_fasta_path primer_bedpe_path run_cmds vigor_workflow report_template);
+our @EXPORT_OK = qw(reference_fasta_path primer_bedpe_path run_cmds vigor_workflow report_template
+		    reference_gff_path
+		    artic_bed artic_reference);
 
 our $ReferenceFasta = "MN908947.fasta";
+our $ReferenceGFF = "GCF_009858895.2_ASM985889v3_genomic.gff";
 our $PrimerBedpe = "SC2_200324.bedpe";
 our $ArticSchemes = "primer_schemes";
 our $VigorWorkflow = "vigor.wf";
@@ -42,6 +45,12 @@ sub reference_fasta_path
     return $ref;
 }
 
+sub reference_gff_path
+{
+    my $ref = mpath() . "/$ReferenceGFF";
+    return $ref;
+}
+
 sub report_template
 {
     my $ref = mpath() . "/$ReportTemplate";
@@ -64,6 +73,21 @@ sub artic_primer_schemes_path
 
     my $ref = "$mpath/$ArticSchemes";
     return $ref;
+}
+
+sub artic_reference
+{
+    my($vers) = @_;
+    my $ref = mpath() . "/$ArticSchemes/nCoV-2019/V$vers/nCoV-2019.reference.fasta";
+    return $ref;
+}
+
+sub artic_bed
+{
+    my($vers) = @_;
+    my $ref = mpath() . "/ARTIC-V$vers.bed";
+    return $ref;
+    
 }
 
 sub run_cmds

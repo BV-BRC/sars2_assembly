@@ -33,7 +33,7 @@ all: bin primer artic_schemes reference
 
 bin: $(BIN_PERL) $(BIN_SERVICE_PERL)
 
-reference: lib/Bio/P3/SARS2Assembly/MN908947.fasta.fai
+reference: lib/Bio/P3/SARS2Assembly/MN908947.fasta.fai lib/Bio/P3/SARS2Assembly/GCF_009858895.2_ASM985889v3_genomic.gff
 
 #
 # We allow failures on these since we do not have this tooling in the Mac CLI build.
@@ -47,17 +47,29 @@ primer: lib/Bio/P3/SARS2Assembly/SC2_200324.bedpe
 lib/Bio/P3/SARS2Assembly/SC2_200324.bedpe:
 	curl -o $@ -L $(PRIMER_SRC)
 
+lib/Bio/P3/SARS2Assembly/GCF_009858895.2_ASM985889v3_genomic.gff:
+	curl -L https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/009/858/895/GCF_009858895.2_ASM985889v3/GCF_009858895.2_ASM985889v3_genomic.gff.gz | \
+		gunzip > $@
+
 artic_schemes: lib/Bio/P3/SARS2Assembly/primer_schemes
 
 #
 # The latest artic code makes breaking changes not yet synced with their SOP.
 # Stick to the working version.
 #
+
 lib/Bio/P3/SARS2Assembly/primer_schemes:
 	rm -rf artic-ncov2019
 	git clone https://github.com/artic-network/artic-ncov2019.git
 	cd artic-ncov2019; git checkout 335ead0d7cdb4544c17c9dd51491c531878a91cf
 	cp -r artic-ncov2019/primer_schemes lib/Bio/P3/SARS2Assembly
+	cd lib/Bio/P3/SARS2Assembly; \
+	for s in primer_schemes/nCoV-2019/V*; do \
+	   (cd $$s; \
+	   perl -ne 'my @x=split m/\t/; print join("\t",@x[0..3], 60, $x[3]=~m/LEFT/?"+":"-"),"\n";' \
+		nCoV-2019.scheme.bed) > ARTIC-`basename $$s`.bed; \
+	done
+
 
 deploy: deploy-all
 deploy-all: deploy-client 
