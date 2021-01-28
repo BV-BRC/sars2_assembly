@@ -232,8 +232,48 @@ run_cmds(["cat", $reference, "$out_dir/$base.fasta"],
 	 '>',
 	 "$out_dir/$base.align");
 
+
+#
+# Create coverage plot
+#
+
+run_cmds(["samtools", "depth", "$int_dir/$base.isorted.bam"], '>', "$out_dir/$base.depth");
+
+if (-s "$out_dir/$base.depth")
+{
+    eval {
+	$ENV{GDFONTPATH} = "/usr/share/fonts/liberation";
+	my $plot = <<END;
+set term png font "LiberationSans-Regular"
+set xlabel "Position"
+set ylabel "Depth"
+set title "Coverage depth for $base"
+set output "$out_dir/$base.png"
+plot "$out_dir/$base.depth" using 2:3 with impulses title ""
+set output
+END
+    run_cmds(["gnuplot"], "<", \$plot);
+    };
+
+    eval {
+	$ENV{GDFONTPATH} = "/usr/share/fonts/liberation";
+	my $plot = <<END;
+set term png font "LiberationSans-Regular"
+set yrange [0:250]
+set xlabel "Position"
+set ylabel "Depth"
+set title "Coverage depth for $base"
+set output "$out_dir/$base.detail.png"
+plot "$out_dir/$base.depth" using 2:3 with impulses title ""
+set output
+END
+    run_cmds(["gnuplot"], "<", \$plot);
+    };
+
+
+}
+
 system("mv", "$int_dir/$base.isorted.bam", "$out_dir/$base.sorted.bam");
 system("mv", "$int_dir/$base.isorted.bam.bai", "$out_dir/$base.sorted.bam.bai");
 system("gzip", "$out_dir/$base.pileup");
 system("mv", "$ivar_file.tsv", "$out_dir/$base.variants.tsv");
-

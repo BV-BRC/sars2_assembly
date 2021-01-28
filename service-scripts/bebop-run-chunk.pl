@@ -50,6 +50,9 @@ print STDERR "Run from $start to $end\n";
 
 open(S, "<", $sra_defs) or die "Cannot open SRA defs file $sra_defs: $!";
 
+my $ncbi_dir = "/scratch/olson-ncbi";
+system("rm", "-rf", $ncbi_dir);
+
 my @to_run;
 while (<S>)
 {
@@ -109,9 +112,15 @@ sub dl_one
     my $out = "$output/$l2/$sra";
     make_path($out);
 
-    my $ok = run(["p3-sra", "--id", $sra, "--out", $tmp],
+    my $fastq_dir = "$tmp/fastq";
+    make_path($fastq_dir);
+
+    my $ok = run(["p3-sra", "--id", $sra, "--out", $fastq_dir],
 		 ">", "$out/download.stdout",
 		 "2>", "$out/download.stderr");
+
+    unlink("$ncbi_dir/sra/$sra.sra");
+
     $ok or die "p3_sra failed with $? for $sra\n";
 }
 
@@ -128,7 +137,10 @@ sub run_one
     my $out = "$output/$l2/$sra";
     make_path($out);
 
-    my @fastq = glob("$tmp/*.fastq");
+    my $fastq_dir = "$tmp/fastq";
+    make_path($fastq_dir);
+
+    my @fastq = glob("$fastq_dir/*.fastq");
     print STDERR "Run on @fastq\n";
     if (@fastq != 1 && @fastq != 2)
     {
