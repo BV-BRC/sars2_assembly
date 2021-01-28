@@ -82,7 +82,7 @@ sub run_one
     make_path($tmp);
     my $rc = system("p3-sra", "--id", $sra, "--out", $tmp);
     $rc == 0 or die "p3_sra failed with $rc for $sra\n";
-    my $l2 = substr($sra, -2, 2);
+    my $l2 = substr($sra, 0, 7);
     my $out = "$output/$l2/$sra";
     make_path($out);
 
