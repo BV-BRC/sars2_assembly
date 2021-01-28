@@ -24,7 +24,7 @@ my $job_offset = shift;
 my $sra_defs = shift;
 my $output = shift;
 
-my $scratch = "/disks/tmp/bob";
+my $scratch = "/scratch";
 
 $job_offset =~ /^\d+$/ or die "Invalid job offset '$job_offset'\n";
 -d $output or die "Output directory $output does not exist\n";
