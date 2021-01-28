@@ -92,7 +92,7 @@ pareach \@to_run, sub {
 	warn "Error running $id $sra: $@";
     }
     
-}, { Max_Workers => $threads };
+}, { Max_Workers => $workers };
 
 
 sub dl_one
@@ -109,7 +109,7 @@ sub dl_one
 
     my $ok = run(["p3-sra", "--id", $sra, "--out", $tmp],
 		 ">", "$out/download.stdout",
-		 "2>", "$out/download.sterr");
+		 "2>", "$out/download.stderr");
     $ok or die "p3_sra failed with $? for $sra\n";
 }
 
