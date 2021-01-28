@@ -20,7 +20,9 @@
 #
 
 use strict;
+use JSON::XS;
 use Data::Dumper;
+use File::Slurp;
 use File::Path 'make_path';
 use Proc::ParallelLoop;
 use Time::HiRes 'gettimeofday';
@@ -136,10 +138,39 @@ sub run_one
     print STDERR "Run in pid $$ for id $id $sra: @cmd\n";
     my $ok = run(\@cmd,
 	      ">", "$out/assemble.stdout",
-	      "2>", "$out/assemble.sterr");
+	      "2>", "$out/assemble.stderr");
     $ok or warn "Assemble failed with $?\n";
     my $end = gettimeofday;
     my $elap = $end - $start;
+
+    my %md;
+    for my $inp (@fastq)
+    {
+	my $sz = -s $inp;
+	push(@{$md{inputs}}, {filename => $inp, size => $sz});
+    }
+    $md{sra} = $sra;
+    $md{run_index} = $id;
+    $md{start} = $start;
+    $md{end} = $end;
+    $md{elapsed} = $elap;
+    $md{host} = `hostname`;
+    $md{slurm_task} = $ENV{SLURM_ARRAY_TASK_ID};
+    $md{slurm_job} = $ENV{SLURM_JOB_ID};
+    $md{slurm_cluster} = $ENV{SLURM_CLUSTER_NAME};
+    chomp $md{host};
+    eval {
+	my $container_md = decode_json(scalar read_file("/.singularity.d/labels.json"));
+	$md{container_metadata} = $container_md;
+    };
+	
+    if (open(F, ">", "$out/meta.json"))
+    {
+	my $txt = JSON::XS->new->pretty(1)->encode(\%md);
+	print F $txt;
+	close(F);
+    }
+	
     if (open(F, ">", "$out/RUNTIME"))
     {
 	print F "$start\t$end\t$elap\n";
