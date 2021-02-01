@@ -6,7 +6,7 @@ package Bio::P3::SARS2Assembly;
 
 use strict;
 use Module::Metadata;
-use IPC::Run 'run';
+use IPC::Run qw(run timeout);
 use Data::Dumper;
 use JSON::XS;
 use File::Slurp;

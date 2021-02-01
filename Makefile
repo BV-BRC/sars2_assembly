@@ -6,6 +6,13 @@ TARGET ?= /kb/deployment
 
 APP_SERVICE = app_service
 
+WRAP_PYTHON_TOOL = wrap_python3
+WRAP_PYTHON_SCRIPT = bash $(TOOLS_DIR)/$(WRAP_PYTHON3_TOOL).sh
+
+SRC_SERVICE_PYTHON = $(wildcard service-scripts/*.py)
+BIN_SERVICE_PYTHON = $(addprefix $(BIN_DIR)/,$(basename $(notdir $(SRC_SERVICE_PYTHON))))
+DEPLOY_SERVICE_PYTHON = $(addprefix $(SERVICE_DIR)/bin/,$(basename $(notdir $(SRC_SERVICE_PYTHON))))
+
 SRC_PERL = $(wildcard scripts/*.pl)
 BIN_PERL = $(addprefix $(BIN_DIR)/,$(basename $(notdir $(SRC_PERL))))
 DEPLOY_PERL = $(addprefix $(TARGET)/bin/,$(basename $(notdir $(SRC_PERL))))
@@ -31,7 +38,7 @@ PRIMER_SRC = https://raw.githubusercontent.com/CDCgov/SARS-CoV-2_Sequencing/mast
 
 all: bin primer artic_schemes reference
 
-bin: $(BIN_PERL) $(BIN_SERVICE_PERL)
+bin: $(BIN_PERL) $(BIN_SERVICE_PERL) $(BIN_SERVICE_PYTHON)
 
 reference: lib/Bio/P3/SARS2Assembly/MN908947.fasta.fai lib/Bio/P3/SARS2Assembly/GCF_009858895.2_ASM985889v3_genomic.gff
 

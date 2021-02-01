@@ -21,7 +21,7 @@ The generated FASTA consensus sequence is written to output-dir/output-base.fast
 
 use strict;
 use Getopt::Long::Descriptive;
-use IPC::Run 'run';
+use IPC::Run qw(run timeout);
 use Bio::P3::SARS2Assembly qw(artic_reference artic_bed run_cmds reference_gff_path);
 use Data::Dumper;
 use File::Basename;
@@ -36,6 +36,8 @@ my($opt, $usage) = describe_options("%c %o read1 [read2] output-base output-dir"
 				    ["artic-version|a=i" => "ARTIC primer version", { default => 3}],
 				    ["length-threshold|l=i" => "Max length to be considered short read sequencing", { default => 600 }],
 				    ["keep-intermediates|k" => "Save all intermediate files"],
+				    ["delete-reads" => "Delete reads when they have been processed"],
+				    ["samtools-sort-timeout=i" => "Timeout for samtools sort", { default => 120 }],
 				    ["help|h"      => "Show this help message"],
 				    );
 
@@ -147,26 +149,32 @@ $ok or die "Failure $? running seqtk\n";
 # Run the mapper
 # 
 
-# shellcheck disable=SC2086
 run_cmds(["minimap2", @minimap_opts,
 	  $trimmed,
-	  @inputs],
-	 '|',
-	 ["samtools",
-	  "view",
-	  "-u",
-	  "-h",
-	  "-q", $opt->min_quality,
-	  "-F", 4,
-	  "-"],
-	 '|',
-	 ["samtools",
-	  "sort",
-	  "--threads", $opt->threads,
-	  "-"],
-	 '>',
-	 "$int_dir/$base.sorted.bam");
+	  @inputs,
+	  "-o", "$int_dir/minimap.out"]);
 
+if ($opt->delete_reads)
+{
+    print STDERR "Deleting inputs @inputs\n";
+    unlink(@inputs);
+}
+
+run_cmds_with_timeout(240, ["samtools",
+			    "view",
+			    "-u",
+			    "-h",
+			    "-q", $opt->min_quality,
+			    "-F", 4,
+			    "$int_dir/minimap.out"],
+		      '|',
+		      ["samtools",
+		       "sort",
+		       "--threads", $opt->threads,
+		       "-o", "$int_dir/$base.sorted.bam",
+		       "-"]
+		     );
+unlink("$int_dir/minimap.out");
 run_cmds(["samtools", "index", "$int_dir/$base.sorted.bam"]);
 
 my $ivar_file = "$int_dir/$base.ivar";
@@ -179,12 +187,17 @@ run_cmds(["ivar",
 	  "-b", artic_bed($opt->artic_version),
 	  "-p", $ivar_file]);
 
-run_cmds(["samtools",
-	  "sort",
-	  "$ivar_file.bam",
-	  "--threads", $opt->threads],
-	 ">",
-	 "$int_dir/$base.isorted.bam");
+#
+# We are hitting seemingly random timeouts on Bebop with this sort.
+#
+# Work around it with a timeout and rerun attempt.
+#
+
+run_cmds_with_timeout($opt->samtools_sort_timeout, ["samtools",
+						    "sort",
+						    "$ivar_file.bam",
+						    "--threads", $opt->threads,
+						    "-o", "$int_dir/$base.isorted.bam"]);
 
 run_cmds(["samtools", "index", "$int_dir/$base.isorted.bam"]);
 
@@ -275,5 +288,43 @@ END
 
 system("mv", "$int_dir/$base.isorted.bam", "$out_dir/$base.sorted.bam");
 system("mv", "$int_dir/$base.isorted.bam.bai", "$out_dir/$base.sorted.bam.bai");
-system("gzip", "$out_dir/$base.pileup");
+system("gzip", "-f", "$out_dir/$base.pileup");
 system("mv", "$ivar_file.tsv", "$out_dir/$base.variants.tsv");
+
+sub run_cmds_with_timeout
+{
+    my($timeout, @cmds) = @_;
+
+    print STDERR "Execute with timeout=$timeout:\n";
+    for my $c (@cmds)
+    {
+	if (ref($c) eq 'ARRAY')
+	{
+	    print STDERR "\t@$c\n";
+	}
+	elsif(!ref($c))
+	{
+	    print STDERR "\t$c\n";
+	}
+    }
+
+    while (1)
+    {
+	my $ok = eval { run(@cmds, timeout($timeout)); };
+	print "Run returns $ok $?\n";
+	if ($@ =~ /IPC::Run/)
+	{
+	    warn "Run failed with IPC::Run error (retrying): $@";
+	    next;
+	}
+	if (! $ok)
+	{
+	    die "Failed running pipeline: \n" . Dumper(\@cmds);
+	}
+	else
+	{
+	    last;
+	}
+    }
+}
+
