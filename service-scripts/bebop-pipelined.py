@@ -154,6 +154,7 @@ def annotate_worker(input_queue):
 
         print(cmd, file=sys.stderr)
         subprocess.run(cmd,
+                       cwd=out_dir,
                        stdout=open(f"{out_dir}/annotate.stdout", "a"),
                        stderr=open(f"{out_dir}/annotate.stderr", "a"))
         end = time.time()
