@@ -21,7 +21,7 @@ The generated FASTA consensus sequence is written to output-dir/output-base.fast
 
 use strict;
 use Getopt::Long::Descriptive;
-use IPC::Run qw(run timeout);
+use IPC::Run qw(run timeout start);
 use Bio::P3::SARS2Assembly qw(artic_reference artic_bed run_cmds reference_gff_path);
 use Data::Dumper;
 use File::Basename;
@@ -210,7 +210,11 @@ run_cmds(["samtools",
 	  "--min-BQ", 0,
 	  "$int_dir/${base}.isorted.bam"],
 	 '>',
-	 "$out_dir/$base.pileup");
+	 "$int_dir/$base.pileup");
+
+my $pileup_compress_handle = start(["gzip", "-c", "$int_dir/$base.pileup"],
+				   '>',
+				   "$out_dir/$base.pileup.gz");
 
 run_cmds(["ivar",
 	  "variants",
@@ -219,7 +223,7 @@ run_cmds(["ivar",
 	  "-g", reference_gff_path,
 	  "-t", 0.6],
 	 "<",
-	 "$out_dir/$base.pileup");
+	 "$int_dir/$base.pileup");
 
 run_cmds(["ivar",
 	  "consensus",
@@ -228,7 +232,7 @@ run_cmds(["ivar",
 	  "-t", 0.6,
 	  "-n", "N"],
 	 "<",
-	 "$out_dir/$base.pileup");
+	 "$int_dir/$base.pileup");
 
 run_cmds(["sed",
 	  '/>/ s/$/ | One Codex consensus sequence/'],
@@ -288,8 +292,11 @@ END
 
 system("mv", "$int_dir/$base.isorted.bam", "$out_dir/$base.sorted.bam");
 system("mv", "$int_dir/$base.isorted.bam.bai", "$out_dir/$base.sorted.bam.bai");
-system("gzip", "-f", "$out_dir/$base.pileup");
+#system("gzip", "-f", "$out_dir/$base.pileup");
 system("mv", "$ivar_file.tsv", "$out_dir/$base.variants.tsv");
+
+print STDERR "Waiting for pileup gzip to finish\n";
+$pileup_compress_handle->finish();
 
 sub run_cmds_with_timeout
 {

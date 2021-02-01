@@ -88,7 +88,7 @@ def compute_worker(threads, input_queue, output_queue):
         start = time.time()
         cmd = ["sars2-onecodex"]
         cmd.extend(fq_files)
-        cmd.extend([sra, out_dir, "--threads", str(threads)])
+        cmd.extend([sra, out_dir, "--threads", str(threads), "--delete-reads"])
 
         print(cmd, file=sys.stderr)
         subprocess.run(cmd,
@@ -218,8 +218,8 @@ def main():
         idx += 1
 
     N_download = 4
-    N_compute = 9
-    N_annotate = N_compute;
+    N_compute = 18
+    N_annotate = N_compute
     app_threads = 4
 
     download_threads = []
