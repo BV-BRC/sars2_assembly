@@ -39,6 +39,7 @@ $metadata = $metadata->[0];
 my $gto = GenomeTypeObject->new;
 $gto->add_contigs(\@contigs);
 
+$gto->{id} = $metadata->{accession};
 $gto->{sra_metadata} = $metadata;
 $gto->{ncbi_taxonomy_id} = $metadata->{sample_taxon} // 2;
 $gto->{scientific_name} = $metadata->{sample_organism} // "Unknown sp.";
