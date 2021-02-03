@@ -38,36 +38,44 @@ def dl_worker(out_dir_base, scratch_dir, ncbi_dir, input_queue, output_queue):
         out_dir = create_out_dir(out_dir_base, sra)
         fq_dir = create_fq_dir(scratch_dir, id)
 
-        subprocess.run(["p3-sra", "--id", sra, "--out", fq_dir,
-                        "--metadata-file", f"{out_dir}/{sra}.json",
-                        "--sra-metadata-file", f"{out_dir}/{sra}.xml",
-                        ],
-                       stdout=open(f"{out_dir}/download.stdout", "w"),
-                       stderr=open(f"{out_dir}/download.stderr", "w"))
+        ret = subprocess.run(["p3-sra", "--id", sra, "--out", fq_dir,
+                              "--metadata-file", f"{out_dir}/{sra}.json",
+                              "--sra-metadata-file", f"{out_dir}/{sra}.xml",
+                              ],
+                             stdout=open(f"{out_dir}/download.stdout", "w"),
+                             stderr=open(f"{out_dir}/download.stderr", "w"))
 
-        fq_files = glob.glob(f"{fq_dir}/*.fastq")
+        if ret.returncode != 0:
+            print(f"Nonzero returncode {ret.returncode} from p3-sra download of {sra}", file=sys.stderr)
+            fh = open(f"{out_dir}/download.failure", "w")
+            print(f"Nonzero returncode {ret.returncode} from p3-sra download of {sra}", file=fh)
+            fh.close()
 
-        if len(fq_files) == 3:
-            fq_files = glob.glob(f"{fq_dir}/*_[12].fastq")
-            
-        fq_files.sort();
-        print(f"found fq files {fq_files}", file=sys.stderr)
+        else:
+        
+            fq_files = glob.glob(f"{fq_dir}/*.fastq")
 
-        if False:
-            handles = []
-            for i in range(1, len(fq_files)):
-                h = subprocess.Popen(["gzip", "-v", "-f", fq_files[i]])
-                handles.append(h)
-            subprocess.run(["gzip", "-v", "-f", fq_files[0]])
-            for h in handles:
-                h.communicate()
-                    
-            fq_files = glob.glob(f"{fq_dir}/*.fastq.gz")
+            if len(fq_files) == 3:
+                fq_files = glob.glob(f"{fq_dir}/*_[12].fastq")
+
             fq_files.sort();
+            print(f"found fq files {fq_files}", file=sys.stderr)
+
+            if False:
+                handles = []
+                for i in range(1, len(fq_files)):
+                    h = subprocess.Popen(["gzip", "-v", "-f", fq_files[i]])
+                    handles.append(h)
+                subprocess.run(["gzip", "-v", "-f", fq_files[0]])
+                for h in handles:
+                    h.communicate()
+
+                fq_files = glob.glob(f"{fq_dir}/*.fastq.gz")
+                fq_files.sort();
+
+            output_queue.put([id, sra, fq_files, out_dir])
         
         input_queue.task_done()
-
-        output_queue.put([id, sra, fq_files, out_dir])
 
         t = f"{ncbi_dir}/sra/{sra}.sra"
         if os.path.exists(t):
@@ -91,9 +99,9 @@ def compute_worker(threads, input_queue, output_queue):
         cmd.extend([sra, out_dir, "--threads", str(threads), "--delete-reads"])
 
         print(cmd, file=sys.stderr)
-        subprocess.run(cmd,
-                       stdout=open(f"{out_dir}/assemble.stdout", "w"),
-                       stderr=open(f"{out_dir}/assemble.stderr", "w"))
+        ret = subprocess.run(cmd,
+                             stdout=open(f"{out_dir}/assemble.stdout", "w"),
+                             stderr=open(f"{out_dir}/assemble.stderr", "w"))
         end = time.time()
 
         elapsed = end - start
@@ -122,7 +130,15 @@ def compute_worker(threads, input_queue, output_queue):
             if os.path.exists(fq):
                 os.unlink(fq)
         input_queue.task_done()
-        output_queue.put([id, sra, md, out_dir])
+
+        if ret.returncode == 0:
+            output_queue.put([id, sra, md, out_dir])
+        else:
+            print(f"Nonzero returncode {ret.returncode} from assembly of {sra}", file=sys.stderr)
+            fh = open(f"{out_dir}/assembly.failure", "w")
+            print(f"Nonzero returncode {ret.returncode} from assembly of {sra}", file=fh)
+            fh.close()
+            
 
 def annotate_worker(input_queue):
     me = threading.current_thread().name
