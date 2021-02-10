@@ -92,7 +92,7 @@ class SraSample:
     
     def find_fq_files(self):
 
-        for suffix in ('fastq', 'fq.gz'):
+        for suffix in ('fastq', 'fastq.gz', 'fq.gz'):
             print(f"check {suffix}")
             fq_files = glob.glob(f"{self.path}/*.{suffix}")
             print(f"files: {self.path} {fq_files}")
