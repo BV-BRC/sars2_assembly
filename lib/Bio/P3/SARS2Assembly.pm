@@ -9,6 +9,7 @@ use Module::Metadata;
 use IPC::Run qw(run timeout);
 use Data::Dumper;
 use JSON::XS;
+use Time::HiRes 'gettimeofday';
 use File::Slurp;
 
 use base 'Exporter';
@@ -107,7 +108,11 @@ sub run_cmds
 	}
     }
 
+    my $start = gettimeofday;
     my $ok = run(@cmds);
+    my $end = gettimeofday;
+    my $elap = $end - $start;
+    print STDERR "Run returns $ok $? elapsed=$elap\n";
     $ok or die "Failed running pipeline: \n" . Dumper(\@cmds);
 }
 

@@ -31,7 +31,11 @@ while (my($id, $def, $seq) = read_next_fasta_seq(\*CTG))
 }
 
 my $metadata = eval { decode_json(scalar read_file($metadata_file)); };
-$metadata or die "Could not read and parse metadata file $metadata_file: $@";
+if (!$metadata)
+{
+    warn "Could not read and parse metadata file $metadata_file: $@";
+    $metadata = [{}];
+}
 
 ref($metadata) eq 'ARRAY' or die "Unexpected non-array metadata\n";
 $metadata = $metadata->[0];

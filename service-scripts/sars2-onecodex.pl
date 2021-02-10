@@ -26,6 +26,7 @@ use Bio::P3::SARS2Assembly qw(artic_reference artic_bed run_cmds reference_gff_p
 use Data::Dumper;
 use File::Basename;
 use File::Temp;
+use Time::HiRes 'gettimeofday';
 
 $ENV{PATH} = "$ENV{KB_RUNTIME}/samtools-1.11/bin:$ENV{KB_RUNTIME}/bcftools-1.9/bin:$ENV{PATH}";
 
@@ -33,6 +34,8 @@ my($opt, $usage) = describe_options("%c %o read1 [read2] output-base output-dir"
 				    ["output-name|n=s" => "Output name for sequence (in the fasta file). Defaults to output-base"],
 				    ["threads|j=i" => "Number of threads to use", { default => 1 }],
 				    ["min-quality|q=i" => "Minimum read quality", { default => 20 }],
+				    ["max-depth|d=i" => "Maxmium depth to use in mpileup", { default => 0 }],
+				    ["min-depth|D=i" => "Minimum depth for consensus base call", { default => 3 }],
 				    ["artic-version|a=i" => "ARTIC primer version", { default => 3}],
 				    ["length-threshold|l=i" => "Max length to be considered short read sequencing", { default => 600 }],
 				    ["keep-intermediates|k" => "Save all intermediate files"],
@@ -204,7 +207,7 @@ run_cmds(["samtools", "index", "$int_dir/$base.isorted.bam"]);
 run_cmds(["samtools",
 	  "mpileup",
 	  "--fasta-ref", $reference,
-	  "--max-depth", 0,
+	  "--max-depth", $opt->max_depth,
 	  "--count-orphans",
 	  "--no-BAQ",
 	  "--min-BQ", 0,
@@ -228,7 +231,7 @@ run_cmds(["ivar",
 run_cmds(["ivar",
 	  "consensus",
 	  "-p", $ivar_file,
-	  "-m", 1,
+	  "-m", $opt->min_depth,
 	  "-t", 0.6,
 	  "-n", "N"],
 	 "<",
@@ -317,8 +320,11 @@ sub run_cmds_with_timeout
 
     while (1)
     {
+	my $start = gettimeofday;
 	my $ok = eval { run(@cmds, timeout($timeout)); };
-	print "Run returns $ok $?\n";
+	my $end = gettimeofday;
+	my $elap = $end - $start;
+	print STDERR "Run returns $ok $? elapsed=$elap\n";
 	if ($@ =~ /IPC::Run/)
 	{
 	    warn "Run failed with IPC::Run error (retrying): $@";

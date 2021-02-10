@@ -15,9 +15,18 @@ import glob
 import time
 import socket
 import json
+import argparse
+import redis
+import re
+import pickle
+from pathlib import Path
 
-def create_out_dir(out_dir_base, sra):
+def compute_out_dir(out_dir_base, sra):
     path = f"{out_dir_base}/{sra[0:7]}/{sra}"
+    return path
+    
+def create_out_dir(out_dir_base, sra):
+    path = compute_out_dir(out_dir_base, sra)
     os.makedirs(path, exist_ok=True)
     return path
 
@@ -26,10 +35,22 @@ def create_fq_dir(scratch, task):
     os.makedirs(path, exist_ok=True)
     return path
 
-def dl_worker(out_dir_base, scratch_dir, ncbi_dir, input_queue, output_queue):
-    print(threading.current_thread().name)
+def dl_worker(aff, out_dir_base, scratch_dir, ncbi_dir, redis_conn, input_queue, output_queue):
+    me = threading.current_thread().name
+
+    if aff:
+        print(f"{me} starting with affinity {aff}")
+        os.sched_setaffinity(0, aff)
     while True:
-        item = input_queue.get()
+
+        if redis_conn is not None:
+            pitem = redis_conn.rpop("sra")
+            if pitem is None:
+                break
+            item = pickle.loads(pitem)
+        else:
+            item = input_queue.get()
+            
         if item is None:
             break
         print("got item ", item)
@@ -37,6 +58,10 @@ def dl_worker(out_dir_base, scratch_dir, ncbi_dir, input_queue, output_queue):
         id, sra = item
         out_dir = create_out_dir(out_dir_base, sra)
         fq_dir = create_fq_dir(scratch_dir, id)
+        fail_file = f"{out_dir}/download.failure"
+
+        if os.path.exists(fail_file):
+            os.unlink(fail_file);
 
         ret = subprocess.run(["p3-sra", "--id", sra, "--out", fq_dir,
                               "--metadata-file", f"{out_dir}/{sra}.json",
@@ -47,7 +72,7 @@ def dl_worker(out_dir_base, scratch_dir, ncbi_dir, input_queue, output_queue):
 
         if ret.returncode != 0:
             print(f"Nonzero returncode {ret.returncode} from p3-sra download of {sra}", file=sys.stderr)
-            fh = open(f"{out_dir}/download.failure", "w")
+            fh = open(fail_file, "w")
             print(f"Nonzero returncode {ret.returncode} from p3-sra download of {sra}", file=fh)
             fh.close()
 
@@ -74,15 +99,20 @@ def dl_worker(out_dir_base, scratch_dir, ncbi_dir, input_queue, output_queue):
                 fq_files.sort();
 
             output_queue.put([id, sra, fq_files, out_dir])
-        
-        input_queue.task_done()
 
-        t = f"{ncbi_dir}/sra/{sra}.sra"
-        if os.path.exists(t):
-            os.unlink(t)
+        if input_queue:
+            input_queue.task_done()
 
-def compute_worker(threads, input_queue, output_queue):
+        if ncbi_dir:
+            path = f"{ncbi_dir}/sra/{sra}.sra"
+            if os.path.exists(path):
+                os.unlink(path)
+
+def compute_worker(aff,threads, input_queue, output_queue):
     me = threading.current_thread().name
+    if aff:
+        print(f"{me} starting with affinity {aff}")
+        os.sched_setaffinity(0, aff)
     while True:
         print(f"{me} waiting")
         item = input_queue.get()
@@ -140,8 +170,11 @@ def compute_worker(threads, input_queue, output_queue):
             fh.close()
             
 
-def annotate_worker(input_queue):
+def annotate_worker(aff, input_queue):
     me = threading.current_thread().name
+    if aff:
+        print(f"{me} starting with affinity {aff}")
+        os.sched_setaffinity(0, aff)
     while True:
         print(f"{me} waiting")
         item = input_queue.get()
@@ -186,80 +219,215 @@ def annotate_worker(input_queue):
 
         input_queue.task_done()
 
+def read_sra_defs(sra_defs, output_dir):
+    #
+    # Read our SRA defs to find the inputs needed. Stuff them into input queue.
+    #
+    defs = []
+    with open(sra_defs) as fh:
+        idx = 1
+        for line in fh:
+            cols = line.rstrip().split("\t")
+            sra = cols[0]
+
+            dir = compute_out_dir(output_dir, sra)
+            if not os.path.exists(f"{dir}/{sra}.gto"):
+                defs.append([idx, sra])
+            idx += 1
+
+    return defs
+
+
+#
+# Set up for redis.
+#
+# If we are node 0, we create the redis process, create a
+# client, and push the sra defs to it.
+# If we are not node 0, we create a client connecting to the node 0 hostname.
+#
+def redis_setup(args, sra_defs):
+
+    nodeid = int(os.getenv("SLURM_NODEID"))
+
+    host = socket.gethostname()
+    if args.hostlist:
+        with open(args.hostlist) as f:
+            line = f.readline()
+            nodes = line.rstrip().split('\n')
+    else:
+        proc = subprocess.run(["scontrol", "show", "hostname", os.getenv("SLURM_NODELIST")], capture_output=True)
+        if proc.returncode != 0:
+            print("Cannot determine nodelist", file=sys.stderr)
+            sys.exit(1);
+        nodes = proc.stdout.decode().rstrip().split('\n')
+
+    redis_host = nodes[0]
+
+    print(f"Redis host is {redis_host}")
+
+    redis_proc = None
+
+    redis_server = "/opt/patric-common/runtime/bin/redis-server"
+    
+    redis_proc = None
+
+    if nodeid == 0:
+        print(f"Starting redis on {host}")
+        redis_proc = subprocess.Popen([redis_server, "--protected-mode", "no"])
+    else:
+        print(f"Sleep on {host} to wait for redis to start on {redis_host}")
+        time.sleep(10)
+
+    conn = redis.Redis(host=redis_host)
+
+    if nodeid == 0:
+        time.sleep(3)
+        for d in sra_defs:
+            conn.lpush("sra", pickle.dumps(d))
+
+    return (redis_host, conn, redis_proc)
+        
+def compute_affinity_knl(cpu):
+    aff = []
+    for x in range(0,4):
+        aff.append(cpu + x * 64)
+    return aff
+
+def compute_affinity_bdw(cpu):
+    aff = []
+    aff.append(cpu)
+    return aff
+
 def main():
 
     #
     # commandline processing
     #
 
-    if len(sys.argv) != 5:
-        print(f"usage: {sys.argv[0]} job-offset entries-per-job sra-def-file output-dir", file=sys.stderr)
-        sys.exit(1)
+    parser = argparse.ArgumentParser("Run pipelined SRA annotation and assembly")
+    parser.add_argument('job_offset', type=int, help='Value to add to the Slurm task id to determine the work number for this execution')
+    parser.add_argument('entries_per_job', type=int, help='Number of entries in the data file to be processed per job')
+    parser.add_argument('sra_def_file', type=str, help='File of SRA identifiers to process')
+    parser.add_argument('output_dir', type=str, help='Output directory base')
+    parser.add_argument('--sra-output-queue-size', type=int, help='Size of SRA downloader output queue', default=3)
+    parser.add_argument('--n-downloaders', type=int, help='Number of downloader threads', default=4)
+    parser.add_argument('--n-assemblers', type=int, help='Number of assembler threads', default=18)
+    parser.add_argument('--n-annotators', type=int, help='Number of annotator threads', default=18)
+    parser.add_argument('--n-app-threads', type=int, help='Number of threads for apps', default=4)
+    parser.add_argument('--redis', action='store_true', help='Use redis for job distribution. Implies non-task-array mode')
+    parser.add_argument('--knl', action='store_true', help='Running on KNL node')
+    parser.add_argument('--hostlist', type=str, help='Slurm hostlist')
+    parser.add_argument('--scratch', type=str, help='Scratch directory', default='/scratch')
+    
+    args = parser.parse_args()
 
-    job_offset = int(sys.argv[1])
-    entries_per_job = int(sys.argv[2])
-    sra_defs = sys.argv[3]
-    output = sys.argv[4]
+    job_offset = args.job_offset
+    entries_per_job = args.entries_per_job
+    output = args.output_dir
+    sra_defs = read_sra_defs(args.sra_def_file, output)
 
-    ncbi_dir = "/scratch/olson-ncbi"
+    #
+    # Find our NCBI config file and from there the SRA scratch folder. We
+    # want to keep that cleared out.
+    #
+
+    ncbi_dir = None
+    ncbi_config = Path.home().joinpath(".ncbi/user-settings.mkfg")
+    if ncbi_config.exists():
+        with ncbi_config.open() as fh:
+            txt = fh.read();
+            m = re.search(r'/repository/user/default-path\s*=\s*"(.*)"', txt)
+            if m:
+                ncbi_dir = m.group(1)
 
     scratch = os.getenv("SCRATCH_DIR")
     if scratch is None:
-        scratch = "/scratch"
+        scratch = args.scratch
 
+    #
+    # If we are in redis mode and are on node 0 of the nodelist,
+    # start the redis server and push the contents of the job file
+    # into the job list.
+    #
+    # In redis mode, the downloaders will block on a redis list read.
+    #
+    # In non-redis mode, they will block on the input queue.
+    #
 
-    start = job_offset + (int(os.getenv("SLURM_ARRAY_TASK_ID")) - 1) * entries_per_job + 1
-    end = start + entries_per_job - 1
+    redis_info = redis_conn = None
+    input_queue = None
+    if args.redis:
+        redis_info = redis_setup(args, sra_defs)
+        print(redis_info)
+        redis_host, redis_conn, redis_proc = redis_info
+
+    else:
+        
+        start = job_offset + (int(os.getenv("SLURM_ARRAY_TASK_ID")) - 1) * entries_per_job + 1
+        end = start + entries_per_job - 1
+        input_queue = queue.Queue()
+
+        for i in range(start, end+1):
+            input_queue.put(sra_defs[i])
 
     #
     # Our queues
     #
 
-    input_queue = queue.Queue()
-    compute_queue = queue.Queue(3)
+    compute_queue = queue.Queue(args.sra_output_queue_size)
     annotate_queue = queue.Queue()
 
-    #
-    # Read our SRA defs to find the inputs needed. Stuff them into input queue.
-    #
-    fh = open(sra_defs)
-    idx = 1
-    print("Running the following libraries:")
-    for line in fh:
-        cols = line.split("\t")
-        sra = cols[0]
-        if idx >= start and idx <= end:
-            print(f"{idx}\t{sra}")
-            input_queue.put([idx, sra])
-        idx += 1
+    N_download = args.n_downloaders
+    N_compute = args.n_assemblers
+    N_annotate = args.n_annotators
+    app_threads = args.n_app_threads
 
-    N_download = 4
-    N_compute = 18
-    N_annotate = N_compute
-    app_threads = 4
+    cpu = 0
+    if args.knl:
+        compute_affinity = compute_affinity_knl
+    else:
+        compute_affinity = compute_affinity_bdw
+        
 
     download_threads = []
     for i in range(N_download):
-        t = threading.Thread(target = dl_worker, name = f"dl-{i}", args=[output, scratch, ncbi_dir, input_queue, compute_queue])
+
+        if args.knl:
+            aff = compute_affinity(cpu)
+        else:
+            aff = [cpu, cpu + 1]
+            cpu += 1
+        cpu += 1
+
+        t = threading.Thread(target = dl_worker, name = f"dl-{i}", args=[aff, output, scratch, ncbi_dir, redis_conn, input_queue, compute_queue])
         t.start()
         download_threads.append(t)
 
     compute_threads = []
     for i in range(N_compute):
-        t = threading.Thread(target = compute_worker, name=f"compute-{i}", args=[app_threads, compute_queue, annotate_queue])
+        
+        aff = compute_affinity(cpu)
+        cpu += 1
+            
+        t = threading.Thread(target = compute_worker, name=f"compute-{i}", args=[aff, app_threads, compute_queue, annotate_queue])
         t.start()
         compute_threads.append(t)
 
     annotate_threads = []
     for i in range(N_annotate):
-        t = threading.Thread(target = annotate_worker, name=f"annotate-{i}", args=[annotate_queue])
+
+        aff = compute_affinity(cpu)
+        cpu += 1
+
+        t = threading.Thread(target = annotate_worker, name=f"annotate-{i}", args=[aff,annotate_queue])
         t.start()
         annotate_threads.append(t)
 
-    input_queue.join()
-    print("inputs done")
-    for i in range(N_download):
-        input_queue.put(None)
+    if input_queue:
+        input_queue.join()
+        print("inputs done")
+        for i in range(N_download):
+            input_queue.put(None)
     for t in download_threads:
         t.join()
     compute_queue.join()
