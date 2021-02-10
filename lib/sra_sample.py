@@ -5,6 +5,7 @@
 from pathlib import Path
 import glob
 import os
+import sys
 import subprocess
 
 def read_defs_from_file(def_file, base_dir):
@@ -75,14 +76,14 @@ class SraSample:
 
             cmd = ["fasterq-dump",
                    "-o", f"{self.id}.fastq",
-                   "-O", self.path,
+                   "-O", str(self.path),
                    "--split-files",
                    "-t", tmpdir,
-                   sra,
+                   str(sra)
                    ]
             ret = subprocess.run(cmd)
             if ret.returncode != 0:
-                print(f"fasterqdump of {sra} failed with {ret.returncode}", file=sys.stderr)
+                print(f"fasterqdump of {sra} failed with {ret.returncode} {cmd}", file=sys.stderr)
                 return None
         fq_files = self.find_fq_files()
         if fq_files is not None:
