@@ -20,8 +20,9 @@ def worker(aff, threads, input_queue, output_path):
     me = threading.current_thread().name
 
     if output_path:
-        sys.stdout = open(output_path / f"{me}.stdout", "wb", 0)
-        sys.stderr = open(output_path / f"{me}.stderr", "wb", 0)
+        print (f"{me} log to {output_path}")
+        sys.stdout = open(output_path / f"{me}.stdout", "w", 1)
+        sys.stderr = open(output_path / f"{me}.stderr", "w", 1)
 
     if aff:
         print(f"{me} starting with affinity {aff}")

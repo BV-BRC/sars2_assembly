@@ -86,6 +86,7 @@ def main():
     if args.log_output and slurm_job:
         output_path = Path(args.log_output) / slurm_job
         output_path.mkdir(parents=True, exist_ok=True)
+        print(f"logging thread output to {output_path}")
 
     output = args.output_dir
     sra_defs = sra_sample.read_defs_from_file(args.sra_def_file, output)
