@@ -7,7 +7,7 @@ import sys
 import json
 import shutil
 
-def worker(aff, threads, input_queue):
+def worker(aff, threads, input_queue, output_path):
     """ Worker that runs both assembly and annotation
 
     The items we receive from the input_queue are SraSample instances.
@@ -16,8 +16,13 @@ def worker(aff, threads, input_queue):
     download from SRA. We prefer not to download from SRA so that we can
     have more consistent runtimes and not risk throttling from SRA.
     """
-    
+
     me = threading.current_thread().name
+
+    if output_path:
+        sys.stdout = open(output_path / f"{me}.stdout", "wb", 0)
+        sys.stderr = open(output_path / f"{me}.stderr", "wb", 0)
+
     if aff:
         print(f"{me} starting with affinity {aff}")
         os.sched_setaffinity(0, aff)
@@ -28,7 +33,7 @@ def worker(aff, threads, input_queue):
         if item is None:
             print(me, " got none")
             break
-        print(f"{me} got {item}")
+        print(f"{me} got {item.id}")
 
         sra = item.id
         out_dir = item.path

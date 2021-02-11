@@ -75,10 +75,17 @@ def main():
     parser.add_argument('--knl', action='store_true', help='Running on KNL node')
     parser.add_argument('--scratch', type=str, help='Scratch directory', default='/scratch')
     parser.add_argument('--metadata-cache', type=str, help='Cache of SRA metadata files', default='/home/olson/sra-output/data-files')
+    parser.add_argument('--log-output', type=str, help='Directory to write per-thread outputs')
 
     args = parser.parse_args()
 
     sra_sample.SraSample.md_cache = Path(args.metadata_cache)
+
+    output_path = None
+    slurm_job = os.getenv("SLURM_JOB_ID")
+    if args.log_output and slurm_job:
+        output_path = pathlib.path(args.log_output) / slurm_job
+        output_path.mkdir(parents=True, exist_ok=True)
 
     output = args.output_dir
     sra_defs = sra_sample.read_defs_from_file(args.sra_def_file, output)
@@ -135,14 +142,14 @@ def main():
         aff = compute_affinity(cpu)
         cpu += 1
             
-        t = threading.Thread(target = compute_all.worker, name=f"compute-{i}", args=[aff, app_threads, compute_queue])
+        t = threading.Thread(target = compute_all.worker, name=f"compute-{i}", args=[aff, app_threads, compute_queue, output_path])
         t.start()
         compute_threads.append(t)
 
     #
     # We run the downloader in this thread.
     #
-    redis_feeder.worker(None, redis_conn, compute_queue)
+    redis_feeder.worker(None, redis_conn, compute_queue, output_path)
 
     #
     # Clean up and wait.
