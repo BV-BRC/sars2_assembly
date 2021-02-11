@@ -21,7 +21,7 @@ def read_defs_from_file(def_file, base_dir):
 
             sra = SraSample(id, idx, base_dir)
 
-            if not sra.has_output_with_suffix("gto"):
+            if not sra.has_output_with_suffix("fasta"):
                 defs.append(sra)
 
             idx += 1

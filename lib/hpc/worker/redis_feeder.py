@@ -13,14 +13,14 @@ def worker(aff, redis_conn, output_queue, output_path):
     Push the sample onto our output queue.
     """
     me = threading.current_thread().name
+    out_fh = sys.stdout
 
     if output_path:
         print (f"{me} log to {output_path}")
-        sys.stdout = open(output_path / f"{me}.stdout", "w", 1)
-        sys.stderr = open(output_path / f"{me}.stderr", "w", 1)
+        out_fh = open(output_path / f"{me}.out", "w", 1)
 
     if aff:
-        print(f"{me} starting with affinity {aff}")
+        print(f"{me} starting with affinity {aff}", file=out_fh)
         os.sched_setaffinity(0, aff)
     while True:
 
@@ -32,7 +32,7 @@ def worker(aff, redis_conn, output_queue, output_path):
         if item is None:
             break
 
-        print(f"{me}: got item {item.id}")
+        print(f"{me}: got item {item.id}", file=out_fh)
 
         output_queue.put(item)
 

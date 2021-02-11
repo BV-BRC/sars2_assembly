@@ -11,6 +11,7 @@ use GenomeTypeObject;
 use gjoseqlib;
 
 my($opt, $usage) = describe_options("%c %o contigs sra-metadata-json output.gto",
+				    ["accession=s" => "SRA accession number"],
 				    ["help" => "Show this help message."],
 				   );
 print($usage->text), exit 0 if $opt->help;
@@ -34,7 +35,12 @@ my $metadata = eval { decode_json(scalar read_file($metadata_file)); };
 if (!$metadata)
 {
     warn "Could not read and parse metadata file $metadata_file: $@";
-    $metadata = [{}];
+    $metadata = {
+	(defined($opt->accession) ? (run_id => $opt->accession, accession => $opt->accession) : ()),
+	sample_taxon => 2697049,
+	sample_organism => "Severe acute respiratory syndrome coronavirus 2",
+    };
+    $metadata = [$metadata];
 }
 
 ref($metadata) eq 'ARRAY' or die "Unexpected non-array metadata\n";
