@@ -33,6 +33,8 @@ def read_defs_from_file(def_file, base_dir):
 
 class SraSample:
 
+    fastq_tmp = "/tmp"
+
     def __init__(self, id, idx, base_dir):
         self.base_dir = base_dir
         
@@ -76,10 +78,6 @@ class SraSample:
             
         sra = self.path / f"{self.id}.sra"
 
-        tmpdir = os.getenv("TMPDIR")
-        if tmpdir is None:
-            tmpdir = "/tmp"
-            
         if sra.exists():
             print(f"load from {sra}", file=out_fh)
 
@@ -87,9 +85,10 @@ class SraSample:
                    "-o", f"{self.id}.fastq",
                    "-O", str(self.path),
                    "--split-files",
-                   "-t", tmpdir,
+                   "-t", self.fastq_tmp,
                    str(sra)
                    ]
+            print(cmd, file=out_fh)
             ret = subprocess.run(cmd, stdout=out_fh, stderr=out_fh)
             if ret.returncode != 0:
                 print(f"fasterqdump of {sra} failed with {ret.returncode} {cmd}", file=out_fh)

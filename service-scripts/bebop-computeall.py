@@ -51,7 +51,7 @@ def redis_setup(args, sra_defs):
 def compute_affinity_knl(cpu):
     aff = []
     for x in range(0,4):
-        aff.append(cpu + x * 64)
+        aff.append(cpu + x * 64 + 1)
     return aff
 
 def compute_affinity_bdw(cpu):
@@ -76,10 +76,13 @@ def main():
     parser.add_argument('--scratch', type=str, help='Scratch directory', default='/scratch')
     parser.add_argument('--metadata-cache', type=str, help='Cache of SRA metadata files', default='/home/olson/sra-output/data-files')
     parser.add_argument('--log-output', type=str, help='Directory to write per-thread outputs')
+    parser.add_argument('--fastq-temp', type=str, help='fastq temp dir')
 
     args = parser.parse_args()
 
     sra_sample.SraSample.md_cache = Path(args.metadata_cache)
+    if args.fastq_temp:
+        sra_sample.SraSample.fastq_tmp = args.fastq_temp
 
     output_path = None
     slurm_job = os.getenv("SLURM_JOB_ID")
@@ -150,7 +153,7 @@ def main():
     #
     # We run the downloader in this thread.
     #
-    redis_feeder.worker(None, redis_conn, compute_queue, output_path)
+    redis_feeder.worker([0], redis_conn, compute_queue, output_path)
 
     #
     # Clean up and wait.
