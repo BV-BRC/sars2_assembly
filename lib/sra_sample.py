@@ -81,6 +81,9 @@ class SraSample:
         if sra.exists():
             print(f"load from {sra}", file=out_fh)
 
+            if self.max_fasterq > 0:
+                self.fasterq_semaphore.acquire()
+
             cmd = ["fasterq-dump",
                    "-o", f"{self.id}.fastq",
                    "-O", str(self.path),
@@ -90,6 +93,10 @@ class SraSample:
                    ]
             print(cmd, file=out_fh)
             ret = subprocess.run(cmd, stdout=out_fh, stderr=out_fh)
+
+            if self.max_fasterq > 0:
+                self.fasterq_semaphore.release()
+
             if ret.returncode != 0:
                 print(f"fasterqdump of {sra} failed with {ret.returncode} {cmd}", file=out_fh)
                 return None

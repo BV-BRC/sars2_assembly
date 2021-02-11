@@ -77,9 +77,14 @@ def main():
     parser.add_argument('--metadata-cache', type=str, help='Cache of SRA metadata files', default='/home/olson/sra-output/data-files')
     parser.add_argument('--log-output', type=str, help='Directory to write per-thread outputs')
     parser.add_argument('--fastq-temp', type=str, help='fastq temp dir')
+    parser.add_argument('--max-fasterq', type=int, help='Max number of threads allowed to run fasterq-dump at once', default=0)
 
     args = parser.parse_args()
 
+    sra_sample.SraSample.max_fasterq = args.max_fasterq
+    if args.max_fasterq > 0:
+        sra_sample.SraSample.fasterq_semaphore = threading.Semaphore(args.max_fasterq)
+        
     sra_sample.SraSample.md_cache = Path(args.metadata_cache)
     if args.fastq_temp:
         sra_sample.SraSample.fastq_tmp = args.fastq_temp
