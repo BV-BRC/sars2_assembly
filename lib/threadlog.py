@@ -14,7 +14,7 @@ def open_logger(base_dir):
     return out_fh
 
 def get_logger():
-    if thr_local.hasattr("out_fh"):
+    if hasattr(thr_local, "out_fh"):
         return thr_local.out_fh
     else:
         return sys.stdout
