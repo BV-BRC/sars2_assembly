@@ -3,6 +3,7 @@ import os
 import sys
 import threading
 import pickle
+import threadlog
 
 def worker(aff, redis_conn, output_queue, output_path):
     """Redis feeder worker
@@ -16,8 +17,7 @@ def worker(aff, redis_conn, output_queue, output_path):
     out_fh = sys.stdout
 
     if output_path:
-        print (f"{me} log to {output_path}")
-        out_fh = open(output_path / f"{me}.out", "w", 1)
+        out_fh = threadlog.open_logger(output_path)
 
     if aff:
         print(f"{me} starting with affinity {aff}", file=out_fh)

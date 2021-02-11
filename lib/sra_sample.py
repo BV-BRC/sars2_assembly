@@ -7,6 +7,8 @@ import glob
 import os
 import sys
 import subprocess
+import threading
+import threadlog
 
 def read_defs_from_file(def_file, base_dir):
     #
@@ -60,6 +62,13 @@ class SraSample:
         For now we don't actually do the SRA download.
         """
 
+        me = threading.current_thread().name
+        print(f"sample me={me}")
+
+        out_fh = threadlog.get_logger()
+        if not out_fh:
+            out_fh = sys.stdout
+
         fq_files = self.find_fq_files()
 
         if fq_files is not None:
@@ -72,7 +81,7 @@ class SraSample:
             tmpdir = "/tmp"
             
         if sra.exists():
-            print("load from sra")
+            print(f"load from {sra}", file=out_fh)
 
             cmd = ["fasterq-dump",
                    "-o", f"{self.id}.fastq",
@@ -81,9 +90,9 @@ class SraSample:
                    "-t", tmpdir,
                    str(sra)
                    ]
-            ret = subprocess.run(cmd)
+            ret = subprocess.run(cmd, stdout=out_fh, stderr=out_fh)
             if ret.returncode != 0:
-                print(f"fasterqdump of {sra} failed with {ret.returncode} {cmd}", file=sys.stderr)
+                print(f"fasterqdump of {sra} failed with {ret.returncode} {cmd}", file=out_fh)
                 return None
         fq_files = self.find_fq_files()
         if fq_files is not None:

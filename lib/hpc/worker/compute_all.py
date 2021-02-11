@@ -6,6 +6,7 @@ import time
 import sys
 import json
 import shutil
+import threadlog
 
 def worker(aff, threads, input_queue, output_path):
     """ Worker that runs both assembly and annotation
@@ -21,8 +22,7 @@ def worker(aff, threads, input_queue, output_path):
 
     out_fh = sys.stdout
     if output_path:
-        print (f"{me} log to {output_path}")
-        out_fh = open(output_path / f"{me}.out", "w", 1)
+        out_fh = threadlog.open_logger(output_path)
 
     if aff:
         print(f"{me} starting with affinity {aff}", file=out_fh)
@@ -45,7 +45,10 @@ def worker(aff, threads, input_queue, output_path):
 
         dl_output = item.download()
         if dl_output is None:
-            return
+            print(f"{me} has failed download for {sra}", file=out_fh)
+            input_queue.task_done()
+            continue
+
         fq_files, delete_reads = dl_output
 
         print(f"{me} has {fq_files} delete={delete_reads}", file=out_fh)
