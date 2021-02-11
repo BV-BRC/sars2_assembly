@@ -84,7 +84,7 @@ def main():
     output_path = None
     slurm_job = os.getenv("SLURM_JOB_ID")
     if args.log_output and slurm_job:
-        output_path = pathlib.path(args.log_output) / slurm_job
+        output_path = Path(args.log_output) / slurm_job
         output_path.mkdir(parents=True, exist_ok=True)
 
     output = args.output_dir
