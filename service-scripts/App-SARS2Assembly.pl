@@ -35,6 +35,7 @@ use strict;
 use Cwd;
 use Carp;
 use Data::Dumper;
+use File::Path 'make_path';
 use File::Temp;
 use File::Basename;
 use IO::Handle;
@@ -50,11 +51,21 @@ use Bio::KBase::AppService::ReadSet;
 our %default_platform_recipe = (illumina => 'cdc-illumina',
 				nanopore => 'cdc-nanopore',
 				);
-our %valid_platform_recipe = (illumina => { 'cdc-illumina' => 1 },
-			      nanopore => { 'cdc-nanopore' => 1,
-						'artic-nanopore' => 1 ,
-					    },
-			      );
+#our %default_platform_recipe = (illumina => 'onecodex',
+#				nanopore => 'onecodex',
+#				);
+our %valid_platform_recipe =
+    (
+     illumina => {
+	 'cdc-illumina' => 1,
+	 'onecodex' => 1,
+     },
+     nanopore => {
+	 'cdc-nanopore' => 1,
+	 'artic-nanopore' => 1,
+	 'onecodex' => 1,
+     },
+    );
 
 #
 # requirements are [cpu-count, memory]
@@ -62,11 +73,18 @@ our %valid_platform_recipe = (illumina => { 'cdc-illumina' => 1 },
 our %run_requirements = ('cdc-illumina' => [ 12, '16G'],
 			 'cdc-nanopore' => [ 8, '16G'],
 			 'artic-nanopore' => [ 8, '16G'],
+			 'onecodex' => [8, '16G'],
 			 );
 
 our %recipe_tool = ('cdc-illumina' => 'sars2-cdc-illumina',
 		    'cdc-nanopore' => 'sars2-cdc-nanopore',
-		    'artic-nanopore' => 'sars2-artic-nanopore');
+		    'artic-nanopore' => 'sars2-artic-nanopore',
+		    'onecodex' => 'sars2-onecodex');
+#
+# Some tools require specific options for some library types.
+#
+our %tool_library_options;
+$tool_library_options{'sars2-onecodex', 'nanopore'} = ['--nanopore'];
 
 
 my $script = Bio::KBase::AppService::AppScript->new(\&assemble, \&preflight);
@@ -284,7 +302,8 @@ sub assemble
 {
     my($app, $app_def, $raw_params, $params) = @_;
 
-    print "Begin assembly ", Dumper($app_def, $raw_params, $params);
+    print "Begin assembly ",
+    JSON::XS->new->pretty(1)->canonical->encode([$app_def, $raw_params, $params]);
 
     my $token = $app->token();
     my $ws = $app->workspace();
@@ -302,7 +321,9 @@ sub assemble
     
     my $readset = Bio::KBase::AppService::ReadSet->create_from_asssembly_params($params, 1);
 
-    my($ok, $errs) = $readset->validate($ws);
+    my $metadata_dir = "$stage_dir/sra-metadata";
+    make_path($metadata_dir);
+    my($ok, $errs) = $readset->validate($ws, "$metadata_dir/");
 
     if (!$ok)
     {
@@ -324,13 +345,21 @@ sub assemble
     my $tool = $recipe_tool{$recipe};
     $tool or die "No tool found for recipe $recipe\n";
 
-    my @params;
+    my $opts = $tool_library_options{$tool, $details->{library_type}} // [];
+
+    my @params = @$opts;
+    
     push(@params, "-j", $cpu) if $cpu;
 
-    # CDC illumina recipe supports min read depth parameter
-    if ($recipe eq 'cdc-illumina' && $params->{min_depth} > 0)
+    # Onecodex & CDC illumina recipes supports min read depth parameter
+    if (($recipe eq 'onecodex' || $recipe eq 'cdc-illumina') && $params->{min_depth} > 0)
     {
 	push(@params, "--min-depth", $params->{min_depth});
+    }
+
+    if (($recipe eq 'onecodex') && $params->{max_depth} > 0)
+    {
+	push(@params, "--max-depth", $params->{max_depth});
     }
 
     if ($params->{keep_intermediates})
@@ -393,10 +422,25 @@ sub assemble
 	stderr => "txt",
 	jpg => 'jpg',
 	json => 'json',
+	xml => 'xml',
     };
 
     my $save_path = $asm_out;
 
+    write_dir($ws, $save_path, $output_folder, $type_map);
+    $ws->create({ objects => [["$output_folder/sra-metadata", 'folder']] });
+    write_dir($ws, $metadata_dir, "$output_folder/sra-metadata", $type_map);
+    
+    if (!$asm_ok)
+    {
+	die "Assembler failed with rc=$asm_rc";
+    }
+}
+
+
+sub write_dir
+{
+    my($ws, $save_path, $output_folder, $type_map) = @_;
     if (opendir(DIR, $save_path))
     {
 	while (my $f = readdir(DIR))
@@ -421,11 +465,4 @@ sub assemble
     {
 	warn "Cannot opendir $save_path: $!";
     }
-
-    if (!$asm_ok)
-    {
-	die "Assembler failed with rc=$asm_rc";
-    }
 }
-
-

@@ -107,10 +107,11 @@
       "desc": "Recipe used for assembly",
       "type": "enum",
       "enum": [
-        "auto",
-	"cdc-illumina",
-	"cdc-nanopore",
-	"artic-nanopore"
+          "auto",
+	  "onecodex",
+	  "cdc-illumina",
+	  "cdc-nanopore",
+	  "artic-nanopore"
       ]
     },
     {
@@ -119,6 +120,14 @@
       "required": 0,
       "default": 100,
       "desc": "Minimum coverage to add reads to consensus sequence",
+      "type": "int"
+    },
+    {
+      "id": "max_depth",
+      "label": "Maximum depth to add to consensus",
+      "required": 0,
+      "default": 8000,
+      "desc": "Maximum read depth to consider for consensus sequence",
       "type": "int"
     },
     {

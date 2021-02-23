@@ -9,8 +9,10 @@ use File::Slurp;
 use JSON::XS;
 use GenomeTypeObject;
 use gjoseqlib;
+use Bio::P3::SARS2Assembly qw(reference_gff_path add_variants_to_gto);
 
 my($opt, $usage) = describe_options("%c %o contigs sra-metadata-json output.gto",
+				    ["variants=s" => "Variants vcf file"],
 				    ["accession=s" => "SRA accession number"],
 				    ["help" => "Show this help message."],
 				   );
@@ -56,7 +58,17 @@ $gto->{scientific_name} = $metadata->{sample_organism} // "Unknown sp.";
 $gto->{domain} = 'Viruses';
 $gto->{genetic_code} = 1;
 
-$gto->destroy_to_file($output);
+#
+# Process variants if provided
+#
+
+if ($opt->variants)
+{
+    add_variants_to_gto($opt->variants, $gto);
+}
+
+
+$gto->destroy_to_file($output, { canonical => 1 });
     
 
     

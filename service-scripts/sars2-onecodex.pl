@@ -38,6 +38,7 @@ my($opt, $usage) = describe_options("%c %o read1 [read2] output-base output-dir"
 				    ["min-depth|D=i" => "Minimum depth for consensus base call", { default => 3 }],
 				    ["artic-version|a=i" => "ARTIC primer version", { default => 3}],
 				    ["length-threshold|l=i" => "Max length to be considered short read sequencing", { default => 600 }],
+				    ["nanopore" => "Force use of nanopore mapping method"],
 				    ["keep-intermediates|k" => "Save all intermediate files"],
 				    ["delete-reads" => "Delete reads when they have been processed"],
 				    ["samtools-sort-timeout=i" => "Timeout for samtools sort", { default => 120 }],
@@ -132,10 +133,16 @@ while (<F>)
 }
 close(F);
 my $avg = $total / $count;
-my $mapping_mode = ($avg > $opt->length_threshold) ? "map-ont" : "sr";
 
-my @minimap_opts = (-K => "20M",
-		    '-a',
+my $mapping_mode = "sr";
+
+if ($avg > $opt->length_threshold || $opt->nanopore)
+{
+    $mapping_mode = "map-ont";
+}
+
+my @minimap_opts = (-K => "20M", 	# Minibatch size
+		    '-a',		# Output SAM format alignment
 		    -x => $mapping_mode,
 		    -t => $opt->threads);
 
@@ -152,7 +159,8 @@ $ok or die "Failure $? running seqtk\n";
 # Run the mapper
 # 
 
-run_cmds(["minimap2", @minimap_opts,
+run_cmds(["minimap2",
+	  @minimap_opts,
 	  $trimmed,
 	  @inputs,
 	  "-o", "$int_dir/minimap.out"]);

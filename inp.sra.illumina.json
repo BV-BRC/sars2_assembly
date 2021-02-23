@@ -1,8 +1,8 @@
 {
-  "srr_ids": ["SRR11092056"],
-  "recipe": "auto",
+  "srr_ids": ["SRR12449736"],
+  "recipe": "onecodex",
   "output_path": "/olson@patricbrc.org/home/vtest",
-  "output_file": "SRR11092056-out1"
+  "output_file": "SRR12449736-out8"
 }
 
 
