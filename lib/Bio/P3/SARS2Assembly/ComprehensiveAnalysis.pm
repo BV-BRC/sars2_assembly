@@ -220,7 +220,7 @@ sub process_reads
 	}
 	else
 	{
-	    $task = $client->start_app("GenomeAssembly2", $assembly_input, $self->output_folder);
+	    $task = $client->start_app($assembly_app, $assembly_input, $self->output_folder);
 	}
 	
 	print "Created task " . Dumper($task);

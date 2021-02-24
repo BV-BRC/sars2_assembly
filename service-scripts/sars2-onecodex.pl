@@ -30,7 +30,10 @@ use Time::HiRes 'gettimeofday';
 
 $ENV{PATH} = "$ENV{KB_RUNTIME}/samtools-1.11/bin:$ENV{KB_RUNTIME}/bcftools-1.9/bin:$ENV{PATH}";
 
-my($opt, $usage) = describe_options("%c %o read1 [read2] output-base output-dir",
+my($opt, $usage) = describe_options("%c %o output-base output-dir",
+				    ['pe-read-1|1=s@' => "Paired-end mate 1 file", { default => [] }],
+				    ['pe-read-2|2=s@' => "Paired-end mate 2 file", { default => [] }],
+				    ['se-read|U=s@' => "Single-end read file", { default => [] }],
 				    ["output-name|n=s" => "Output name for sequence (in the fasta file). Defaults to output-base"],
 				    ["threads|j=i" => "Number of threads to use", { default => 1 }],
 				    ["min-quality|q=i" => "Minimum read quality", { default => 20 }],
@@ -45,39 +48,43 @@ my($opt, $usage) = describe_options("%c %o read1 [read2] output-base output-dir"
 				    ["help|h"      => "Show this help message"],
 				    );
 
+
 print($usage->text), exit 0 if $opt->help;
-die($usage->text) unless @ARGV == 3 || @ARGV == 4;
+die($usage->text) unless @ARGV == 2;
 
-my $mode;
+my @se_read_files = @{$opt->se_read};
 
-my($se_read, $pe_read_1, $pe_read_2);
+#
+# Unpack the lists of -1 and -2 reads into pairs and verify the counts match.
+#
+# We also construct the @inputs list which is just the linearized list of
+# files. We assume the pair files are named such that minimap2 is happy with them.
+#
+
+my @inputs = @se_read_files;
+
+my @pe_read_files;
+
+my $n1 = @{$opt->pe_read_1};
+my $n2 = @{$opt->pe_read_2};
+
+if ($n1 != $n2)
+{
+    die "Mismatch in paired end read file counts ($n1 mate-1, $n2 mate-2)\n";
+}
+
+for my $i (0 .. $n1 - 1)
+{
+    push(@pe_read_files, [$opt->pe_read_1->[$i], $opt->pe_read_2->[$i]]);
+    push(@inputs, $opt->pe_read_1->[$i], $opt->pe_read_2->[$i]);
+}
 
 my %artic_versions = (1 => 1, 2 => 1, 3 => 1);
 if (!$artic_versions{$opt->artic_version})
 {
     die "Invalid artic version\n";
 }
-
-my @inputs;
-if (@ARGV == 3)
-{
-    $mode = "SE";
-    $se_read  = shift;
-    @inputs = ($se_read);
-}
-elsif (@ARGV == 4)
-{
-    $mode = "PE";
-    $pe_read_1 = shift;
-    $pe_read_2 = shift;
-    @inputs = ($pe_read_1, $pe_read_2);
-}
-else
-{
-    die $usage->text;
-}
-
-
+ 
 #
 # Set output directories
 #

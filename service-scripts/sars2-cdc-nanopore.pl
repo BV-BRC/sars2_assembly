@@ -17,12 +17,13 @@ The generated FASTA consensus sequence is written to output-dir/output-base.fast
 =cut
 
 use strict;
+use Data::Dumper;
 use Getopt::Long::Descriptive;
 use Bio::P3::SARS2Assembly 'run_cmds';
 use File::Basename;
 use File::Temp;
 
-my($opt, $usage) = describe_options("%c %o reads output-base output-dir",
+my($opt, $usage) = describe_options("%c %o reads [reads ... ] output-base output-dir",
 				    ["output-name|n=s" => "Output name for sequence (in the fasta file). Defaults to output-base"],
 				    ["threads|j=i" => "Number of threads to use", { default => 1 }],
 				    ["min-depth|d=i" => "Minimum depth required to call bases in consensus", { default => 3 }],
@@ -31,11 +32,11 @@ my($opt, $usage) = describe_options("%c %o reads output-base output-dir",
 				    );
 
 print($usage->text), exit 0 if $opt->help;
-die($usage->text) unless @ARGV == 3;
+die($usage->text) unless @ARGV >= 3;
 
-my $fastqfile = shift;
-my $base = shift;
-my $out_dir = shift;
+my $out_dir = pop;
+my $base = pop;
+my @reads = @ARGV;
 
 $base =~ m,/, and die "Output base may not have slash characters\n";
 
@@ -84,8 +85,6 @@ open(ROUT, ">", $reference) or die "Cannot open reference $reference: $!";
 }
 	
 
-my $fastqfiltered = "$int_dir/$base.filtered.fastq";
-
 my $samfile = "$int_dir/$base.sam";
 my $bamfile = "$out_dir/$base.bam";
 my $vcf = "$out_dir/$base.vcf";
@@ -109,12 +108,23 @@ my @cutadapt = qw(cutadapt
 		  -m 300
 		  -M 1200
 		  -q 15 );
-push(@cutadapt, 
-     "-j", $threads,
-     "-o", $fastqfiltered,
-     $fastqfile);
 
-run_cmds(\@cutadapt);
+my @filtered;
+for my $fastqfile (@reads)
+{
+    my $bn = basename($fastqfile);
+    $bn =~ s/\.gz$//;
+    $bn =~ s/\.[^.]+$//;
+    my $fastqfiltered = "$int_dir/$bn.filtered.fastq";
+
+    my @cmd = (@cutadapt, 
+	       "-j", $threads,
+	       "-o", $fastqfiltered,
+	       $fastqfile);
+
+    run_cmds(\@cmd);
+    push(@filtered, $fastqfiltered);
+}
 
 #
 # Step 2. Mapping with minimap2
@@ -126,7 +136,7 @@ my @minimap = ("minimap2",
 	       "-x", "map-ont",
 	       "-t", $threads,
 	       $reference,
-	       $fastqfiltered);
+	       @filtered);
 run_cmds(\@minimap, ">", $samfile);
 
 #

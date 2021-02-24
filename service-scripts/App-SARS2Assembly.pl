@@ -145,10 +145,31 @@ sub determine_recipe
     my($app_def, $ws, $params, $readset) = @_;
 
     my @libs = grep { ! $_->{derived_from} } $readset->libraries;
-    if (@libs > 1)
+
+    #
+    # Count the number of libraries by platform.
+    #
+    my(%lib_pe_platform, %lib_se_platform);
+
+    my @pe_libs = grep { $_->is_paired_end() } @libs;
+    my @se_libs = grep { $_->is_single_end() } @libs;
+    
+    $lib_pe_platform{$_->{platform}}++ foreach @pe_libs;
+    $lib_se_platform{$_->{platform}}++ foreach @se_libs;
+
+    my @pe_platforms = keys %lib_pe_platform;
+    my @se_platforms = keys %lib_se_platform;
+
+    if (@pe_platforms && @se_platforms)
     {
-	die "SARS2Assembly only allows a single read set\n" . Dumper(@libs);
+	die "SARS2Assembly does not allow a mix of single-end and paired-end read data\n";
     }
+
+    if (@pe_libs > 1)
+    {
+	die "SARS2Assembly does not allow more than one paired-end read library\n";
+    }
+
     my $lib = @libs[0];
 
     my $details = {};
@@ -205,6 +226,14 @@ sub determine_recipe
     elsif (!$valid_platform_recipe{$lib_type}->{$recipe})
     {
 	die "Recipe $recipe is not valid for platform $platform";
+    }
+
+    #
+    # Artic-nanopore doesn't support multiple read files
+    #
+    if ($recipe eq 'artic-nanopore' && @se_libs > 1)
+    {
+	die "The artic-nanopore recipe does not accept multiple read files.\n";
     }
 
     $details->{platform} = $platform;
