@@ -278,6 +278,7 @@ sub process_reads
 	die "Could not find generated contigs in $contigs_path ($@)\n";
     }
     $stats = $stats->[0]->[0];
+    print Dumper($self);
 
     print STDERR "Setting contigs to assembled contigs at $contigs_path\n";
     $self->contigs($contigs_path);
@@ -306,12 +307,12 @@ sub process_contigs
     $annotation_input->{output_file} = "annotation";
     $annotation_input->{contigs} = $self->contigs;
     $annotation_input->{analyze_quality} = 0;
+    $annotation_input->{assembly_output} = join("/", $self->output_folder, ".assembly");
 
     #
     # We don't require a wait for indexing here.
     #
     $annotation_input->{queue_nowait} = 1;
-
 
     #
     # Download our contigs to do a check to ensure they are valid.
@@ -504,35 +505,53 @@ sub generate_report
     # Load vcf data
     #
 
-    my $vcf = "assembly.vcf.gz";
-    my $vcf2 = "variants.vcf.gz";
-    my $use_vcf = $vcf;
-    my $vcf_txt = "";
-    my @vcf_tabular;
-    eval {
-	$self->app->workspace->download_file("$assembly_folder/$vcf", $vcf, 1, $self->token->token);
-	$self->app->workspace->download_file("$assembly_folder/$vcf2", $vcf2, 1, $self->token->token);
-    };
-    eval {
-        if (-e $vcf2 && -s $vcf2){
-            $use_vcf = $vcf2;
-        }
-	if (open(my $fh, "-|", "gzip", "-d", "-c", $use_vcf))
+    my @vcf_files = ("assembly.vcf.gz", "variants.vcf.gz", "assembly.variants.tsv");
+    my $vcf_file;
+    for my $file (@vcf_files)
+    {
+	eval { $self->app->workspace->download_file("$assembly_folder/$file", $file, 1, $self->token->token); };
+	if (-s $file)
 	{
-	    while (<$fh>)
-	    {
-		next if /^\#\#/;
-
-		s/</&lt;/g;
-		s/>/&gt;/g;
-		$vcf_txt .= $_;
-
-		chomp;
-		push(@vcf_tabular, [split(/\t/, $_)]);
-	    }
-	    close($fh);
+	    $vcf_file = $file;
+	    last;
 	}
-    };
+    }
+
+    my $vcf_fh;
+    
+    if ($vcf_file =~ /gz$/)
+    {
+	if (!open($vcf_fh, "-|", "gzip", "-d", "-c", $vcf_file))
+	{
+	    warn "Cannot gunzip $vcf_file: $!";
+	    undef $vcf_fh;
+	}
+    }
+    else
+    {
+	if (!open($vcf_fh, "<", $vcf_file))
+	{
+	    warn "Cannot open $vcf_file: $!";
+	    undef $vcf_fh;
+	}
+    }
+    my @vcf_tabular;
+    my $vcf_txt = "";
+    if ($vcf_fh)
+    {
+	while (<$vcf_fh>)
+	{
+	    next if /^\#\#/;
+	    
+	    s/</&lt;/g;
+	    s/>/&gt;/g;
+	    $vcf_txt .= $_;
+	    
+	    chomp;
+	    push(@vcf_tabular, [split(/\t/, $_)]);
+	}
+	close($vcf_fh);
+    }
 
     my $templ = Template->new(ABSOLUTE => 1);
     my %vars = (gto => $gto,

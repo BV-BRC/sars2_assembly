@@ -395,10 +395,22 @@ sub assemble
     {
 	push(@params, "--keep-intermediates");
     }
-    
+
+    for my $lib (grep { not $_->{derives} } $readset->libraries)
+    {
+	if ($lib->is_single_end())
+	{
+	    push(@params, "--se-read", $lib->{read_path});
+	}
+	else
+	{
+	    push(@params, "--pe-read-1", $lib->{read_path_1});
+	    push(@params, "--pe-read-2", $lib->{read_path_2});
+	}
+    }
+
     my @cmd = ($tool,
 	       @params,
-	       $readset->paths(),
 	       $params->{output_file},
 	       $asm_out); 
 

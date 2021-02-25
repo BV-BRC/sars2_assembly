@@ -23,7 +23,8 @@ use Bio::P3::SARS2Assembly 'run_cmds';
 use File::Basename;
 use File::Temp;
 
-my($opt, $usage) = describe_options("%c %o reads [reads ... ] output-base output-dir",
+my($opt, $usage) = describe_options("%c %o output-base output-dir",
+				    ['se-read|U=s@' => "Single-end read file(s)", { default => [] }],
 				    ["output-name|n=s" => "Output name for sequence (in the fasta file). Defaults to output-base"],
 				    ["threads|j=i" => "Number of threads to use", { default => 1 }],
 				    ["min-depth|d=i" => "Minimum depth required to call bases in consensus", { default => 3 }],
@@ -32,11 +33,17 @@ my($opt, $usage) = describe_options("%c %o reads [reads ... ] output-base output
 				    );
 
 print($usage->text), exit 0 if $opt->help;
-die($usage->text) unless @ARGV >= 3;
+die($usage->text) unless @ARGV == 2;
 
-my $out_dir = pop;
-my $base = pop;
-my @reads = @ARGV;
+
+my @reads = @{$opt->se_read};
+if (@reads == 0)
+{
+    die "$0: No reads specified\n";
+}
+
+my $base = shift;
+my $out_dir = shift;
 
 $base =~ m,/, and die "Output base may not have slash characters\n";
 

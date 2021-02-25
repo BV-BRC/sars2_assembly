@@ -23,7 +23,10 @@ use Bio::P3::SARS2Assembly 'run_cmds';
 use File::Basename;
 use File::Temp;
 
-my($opt, $usage) = describe_options("%c %o read1 [read2] output-base output-dir",
+my($opt, $usage) = describe_options("%c %o output-base output-dir",
+				    ['pe-read-1|1=s' => "Paired-end mate 1 file" ],
+				    ['pe-read-2|2=s' => "Paired-end mate 2 file"],
+				    ['se-read|U=s' => "Single end read file"],
 				    ["output-name|n=s" => "Output name for sequence (in the fasta file). Defaults to output-base"],
 				    ["threads|j=i" => "Number of threads to use", { default => 1 }],
 				    ["min-depth|d=i" => "Minimum depth required to call bases in consensus", { default => 100 }],
@@ -33,26 +36,32 @@ my($opt, $usage) = describe_options("%c %o read1 [read2] output-base output-dir"
 				    );
 
 print($usage->text), exit 0 if $opt->help;
-die($usage->text) unless @ARGV == 3 || @ARGV == 4;
+die($usage->text) unless @ARGV == 2;
 
 my $mode;
 
 my($se_read, $pe_read_1, $pe_read_2);
 
-if (@ARGV == 3)
+if ($opt->se_read)
 {
-    $mode = "SE";
-    $se_read  = shift;
+    $se_read = $opt->se_read;
+    if ($opt->pe_read_1 || $opt->pe_read_2)
+    {
+	die "$0: only one single-end or paired-library may be specified\n";
+    }
 }
-elsif (@ARGV == 4)
+elsif ($opt->pe_read_1 || $opt->pe_read_2)
 {
-    $mode = "PE";
-    $pe_read_1 = shift;
-    $pe_read_2 = shift;
-}
-else
-{
-    die $usage->text;
+    $pe_read_1 = $opt->pe_read_1;
+    $pe_read_2 = $opt->pe_read_2;
+    if ($opt->se_read)
+    {
+	die "$0: only one single-end or paired-library may be specified\n";
+    }
+    if (!($pe_read_1 && $pe_read_2))
+    {
+	die "$0: If submitting a paired-end  library both the -1 and -2 arguments must be specified\n";
+    }
 }
 
 my $base = shift;

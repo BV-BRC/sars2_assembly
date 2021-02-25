@@ -2,7 +2,12 @@
   "srr_ids": ["SRR12449736"],
   "recipe": "onecodex",
   "output_path": "/olson@patricbrc.org/home/vtest",
-  "output_file": "SRR12449736-out8"
+    "output_file": "comp6",
+    "domain": "Viruses",
+    "taxonomy_id": 2697049,
+    "scientific_name": "Sars COV2",
+    "input_type": "reads",
+    "code": 1
 }
 
 
