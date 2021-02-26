@@ -135,7 +135,20 @@
 <body id="patric-homepage">
 
 
-<h1>SARS2 Assembly Report for [% gto.scientific_name %]</h1>
+<h1>SARS2 Analysis Report for [% gto.scientific_name %]</h1>
+
+[% FOREACH var IN gto.computed_variants -%]
+[% IF var.tool == "pangolin" -%]
+<h2>Pangolin Lineage</h2><p>
+Pangolin version [% var.tool_metadata.pangolin_version %] with 
+pangoLEARN version [% var.tool_metadata.pangoLEARN_version %] determined the
+lineage for this assembly to be <b>[% var.lineage %]</b> with a probability of [% var.probability %].
+<p>Pangolin status:  [% var.status %]
+[% IF var.notes -%]
+<p>Pangolin notes:  [% var.notes %]
+[% END -%]
+[% END -%]
+[% END -%]
 
 [% IF gto.job_data.assembly -%]
 <h2>Assembly statistics</h2>
