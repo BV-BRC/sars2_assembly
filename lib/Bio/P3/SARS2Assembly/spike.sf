@@ -1,0 +1,17 @@
+1	12	Signal peptide
+319	541	RBD
+437	508	RBD ACE2 Motif
+493	493	Mutagenesis
+493	493	Mutagenesis
+501	501	Mutagenesis
+679	684	Mutagenesis
+681	684	Mutagenesis
+682	684	Mutagenesis
+685	686	Cleavage site
+815	816	Cleavage site
+816	837	Fusion peptide 1
+835	855	Fusion peptide 2
+920	970	Heptad repeat 1
+1163	1202	Heptad repeat 2
+1214	1234	Transmembrane
+1269	1273	KxHxx motif
