@@ -19,9 +19,11 @@ The generated FASTA consensus sequence is written to output-dir/output-base.fast
 
 use strict;
 use Getopt::Long::Descriptive;
-use Bio::P3::SARS2Assembly 'run_cmds';
+use Bio::P3::SARS2Assembly;
+use Bio::P3::CmdRunner;
 use File::Basename;
 use File::Temp;
+use JSON::XS;
 
 my($opt, $usage) = describe_options("%c %o output-base output-dir",
 				    ['pe-read-1|1=s' => "Paired-end mate 1 file" ],
@@ -38,6 +40,8 @@ my($opt, $usage) = describe_options("%c %o output-base output-dir",
 print($usage->text), exit 0 if $opt->help;
 die($usage->text) unless @ARGV == 2;
 
+my $runner = Bio::P3::CmdRunner->new;
+
 my $mode;
 
 my($se_read, $pe_read_1, $pe_read_2);
@@ -49,6 +53,7 @@ if ($opt->se_read)
     {
 	die "$0: only one single-end or paired-library may be specified\n";
     }
+    $mode = "SE";
 }
 elsif ($opt->pe_read_1 || $opt->pe_read_2)
 {
@@ -62,6 +67,7 @@ elsif ($opt->pe_read_1 || $opt->pe_read_2)
     {
 	die "$0: If submitting a paired-end  library both the -1 and -2 arguments must be specified\n";
     }
+    $mode = "PE";
 }
 
 my $base = shift;
@@ -123,7 +129,7 @@ open(ROUT, ">", $reference) or die "Cannot open reference $reference: $!";
     }
     close(RIN);
     close(ROUT);
-    run_cmds(["bowtie2-build", $reference, $reference]);
+    $runner->run(["bowtie2-build", $reference, $reference]);
 }
 
 #
@@ -178,7 +184,7 @@ if ($mode eq 'PE')
 	 @min_rl,
 	 "-");
     
-    run_cmds(\@cutadapt1, '|', \@cutadapt2);
+    $runner->run(\@cutadapt1, '|', \@cutadapt2);
     
     #
     # Step 2. Mapping with bowtie. 
@@ -191,7 +197,7 @@ if ($mode eq 'PE')
 		  "-1", $trim1,
 		  "-2", $trim2,
 		  "-S", $samfile);
-    run_cmds(\@bowtie);
+    $runner->run(\@bowtie);
 }
 elsif ($mode eq 'SE')
 {
@@ -214,7 +220,7 @@ elsif ($mode eq 'SE')
 	 @min_rl,
 	);
 
-    run_cmds(\@cutadapt);
+    $runner->run(\@cutadapt);
     
     #
     # Step 2. Mapping with bowtie. 
@@ -226,18 +232,18 @@ elsif ($mode eq 'SE')
 	      "-x", $reference,
 	      "-U", $trim,
 	      "-S", $samfile);
-    run_cmds(\@bowtie);
+    $runner->run(\@bowtie);
 }
    
 #
 # Create bam format output
 #
 
-run_cmds(["samtools", "view", "-b", $samfile],
+$runner->run(["samtools", "view", "-b", $samfile],
 	 "|",
 	 ["samtools", "sort", "-", "--threads", $threads, "-o", $bamfile]);
 
-run_cmds(["samtools", "index", $bamfile]);
+$runner->run(["samtools", "index", $bamfile]);
 
 #
 # Create consensus
@@ -260,7 +266,7 @@ my @con5 = qw(seqtk seq -A -);
 my @con6 = qw(sed 2~2s/[actg]/N/g);
 my @con7 = qw(seqtk seq -l 60 -);
 
-run_cmds(\@con1, '|',
+$runner->run(\@con1, '|',
 	 \@con2, '|',
 	 \@con3, '|',
 	 \@con4, '|',
@@ -274,28 +280,28 @@ run_cmds(\@con1, '|',
 
 for my $v (<$out_dir/*.vcf>)
 {
-    run_cmds(["bgzip", $v]);
+    $runner->run(["bgzip", $v]);
 }
 
 for my $v (<$out_dir/*.vcf.gz>)
 {
     if (! -f "$v.tbi")
     {
-	run_cmds(["tabix", $v]);
+	$runner->run(["tabix", $v]);
     }
 }
 
 my $filter_params = "N_ALT == 0";
 my @con1 = ( "bcftools", "filter", "-e", $filter_params, "$vcf.gz");
 my @con2 = ("bgzip","-c");
-run_cmds(\@con1, '|',
+$runner->run(\@con1, '|',
 	\@con2, '>', "$vcf2.gz");
 
 #
 # Create coverage plot
 #
 
-run_cmds(["samtools", "depth", $bamfile], '>', "$out_dir/$base.depth");
+$runner->run(["samtools", "depth", $bamfile], '>', "$out_dir/$base.depth");
 
 if (-s "$out_dir/$base.depth")
 {
@@ -310,7 +316,7 @@ set output "$out_dir/$base.png"
 plot "$out_dir/$base.depth" using 2:3 with impulses title ""
 set output
 END
-    run_cmds(["gnuplot"], "<", \$plot);
+    $runner->run(["gnuplot"], "<", \$plot);
     };
 
     eval {
@@ -325,9 +331,9 @@ set output "$out_dir/$base.detail.png"
 plot "$out_dir/$base.depth" using 2:3 with impulses title ""
 set output
 END
-    run_cmds(["gnuplot"], "<", \$plot);
+    $runner->run(["gnuplot"], "<", \$plot);
     };
 
 
 }
-
+print STDERR  JSON::XS->new->pretty(1)->canonical(1)->encode($runner->report);

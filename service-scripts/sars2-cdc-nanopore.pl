@@ -19,9 +19,11 @@ The generated FASTA consensus sequence is written to output-dir/output-base.fast
 use strict;
 use Data::Dumper;
 use Getopt::Long::Descriptive;
-use Bio::P3::SARS2Assembly 'run_cmds';
+use Bio::P3::SARS2Assembly;
 use File::Basename;
 use File::Temp;
+use Bio::P3::CmdRunner;
+use JSON::XS;
 
 my($opt, $usage) = describe_options("%c %o output-base output-dir",
 				    ['se-read|U=s@' => "Single-end read file(s)", { default => [] }],
@@ -35,6 +37,7 @@ my($opt, $usage) = describe_options("%c %o output-base output-dir",
 print($usage->text), exit 0 if $opt->help;
 die($usage->text) unless @ARGV == 2;
 
+my $runner = Bio::P3::CmdRunner->new;
 
 my @reads = @{$opt->se_read};
 if (@reads == 0)
@@ -129,7 +132,7 @@ for my $fastqfile (@reads)
 	       "-o", $fastqfiltered,
 	       $fastqfile);
 
-    run_cmds(\@cmd);
+    $runner->run(\@cmd);
     push(@filtered, $fastqfiltered);
 }
 
@@ -144,17 +147,17 @@ my @minimap = ("minimap2",
 	       "-t", $threads,
 	       $reference,
 	       @filtered);
-run_cmds(\@minimap, ">", $samfile);
+$runner->run(\@minimap, ">", $samfile);
 
 #
 # Create bam format output
 #
 
-run_cmds(["samtools", "view", "-b", $samfile],
+$runner->run(["samtools", "view", "-b", $samfile],
 	 "|",
 	 ["samtools", "sort", "-", "--threads", $threads, "-o", $bamfile]);
 
-run_cmds(["samtools", "index", $bamfile]);
+$runner->run(["samtools", "index", $bamfile]);
 
 #
 # Primer clipping
@@ -167,7 +170,7 @@ my @clip = ("bamclipper.sh",
 	    "-o", $out_dir,
 	    "-u", 80,
 	    "-d", 80);
-run_cmds(\@clip);
+$runner->run(\@clip);
 
 #
 # Create consensus
@@ -178,9 +181,9 @@ my @con = ("medaka", "consensus",
 	   $primerclippedbamfile,
 	   $hdf);
 
-run_cmds(\@con);
+$runner->run(\@con);
 
-run_cmds(["medaka", "variant", $reference, $hdf, $vcf]);
+$runner->run(["medaka", "variant", $reference, $hdf, $vcf]);
 
 my @mask = ('vcf_mask_lowcoverage.pl',
 	    "--bam", $primerclippedbamfile,
@@ -190,7 +193,7 @@ my @mask = ('vcf_mask_lowcoverage.pl',
 	    "--consout", $consensusfasta,
 	    "--depth", $opt->min_depth,
 	    "--qual", 40);
-run_cmds(\@mask);
+$runner->run(\@mask);
 
 #
 # Make sure any vcf files in the output folder are bgzipped/indexed.
@@ -198,14 +201,14 @@ run_cmds(\@mask);
 
 for my $v (<$out_dir/*.vcf>)
 {
-    run_cmds(["bgzip", $v]);
+    $runner->run(["bgzip", $v]);
 }
 
 for my $v (<$out_dir/*.vcf.gz>)
 {
     if (! -f "$v.tbi")
     {
-	run_cmds(["tabix", $v]);
+	$runner->run(["tabix", $v]);
     }
 }
 
@@ -213,7 +216,7 @@ for my $v (<$out_dir/*.vcf.gz>)
 # Create coverage plot
 #
 
-run_cmds(["samtools", "depth", $primerclippedbamfile], '>', "$out_dir/$base.depth");
+$runner->run(["samtools", "depth", $primerclippedbamfile], '>', "$out_dir/$base.depth");
 
 
 if (-s "$out_dir/$base.depth")
@@ -229,6 +232,8 @@ set output "$out_dir/$base.png"
 plot "$out_dir/$base.depth" using 2:3 with impulses title ""
 set output
 END
-    run_cmds(["gnuplot"], "<", \$plot);
+    $runner->run(["gnuplot"], "<", \$plot);
     };
 }
+
+print STDERR  JSON::XS->new->pretty(1)->canonical(1)->encode($runner->report);

@@ -23,10 +23,12 @@ use strict;
 use Getopt::Long::Descriptive;
 use IPC::Run qw(run timeout start);
 use Bio::P3::SARS2Assembly qw(artic_reference artic_bed run_cmds reference_gff_path);
+use JSON::XS;
 use Data::Dumper;
 use File::Basename;
 use File::Temp;
 use Time::HiRes 'gettimeofday';
+use Bio::P3::CmdRunner;
 
 $ENV{PATH} = "$ENV{KB_RUNTIME}/samtools-1.11/bin:$ENV{KB_RUNTIME}/bcftools-1.9/bin:$ENV{PATH}";
 
@@ -51,6 +53,8 @@ my($opt, $usage) = describe_options("%c %o output-base output-dir",
 
 print($usage->text), exit 0 if $opt->help;
 die($usage->text) unless @ARGV == 2;
+
+my $runner = Bio::P3::CmdRunner->new;
 
 my @se_read_files = @{$opt->se_read};
 
@@ -158,7 +162,7 @@ my $reference = artic_reference($opt->artic_version);
 -f $reference or die "Cannot read reference $reference\n";
 my $trimmed = "$int_dir/reference_trimmed.fa";
 
-my $ok = run_cmds(["seqtk", "trimfq", "-e", 33, $reference], '>',  $trimmed);
+my $ok = $runner->run(["seqtk", "trimfq", "-e", 33, $reference], '>',  $trimmed);
 
 $ok or die "Failure $? running seqtk\n";
 
@@ -166,7 +170,7 @@ $ok or die "Failure $? running seqtk\n";
 # Run the mapper
 # 
 
-run_cmds(["minimap2",
+$runner->run(["minimap2",
 	  @minimap_opts,
 	  $trimmed,
 	  @inputs,
@@ -178,7 +182,7 @@ if ($opt->delete_reads)
     unlink(@inputs);
 }
 
-run_cmds_with_timeout(240, ["samtools",
+$runner->run_with_timeout(240, ["samtools",
 			    "view",
 			    "-u",
 			    "-h",
@@ -193,11 +197,11 @@ run_cmds_with_timeout(240, ["samtools",
 		       "-"]
 		     );
 unlink("$int_dir/minimap.out");
-run_cmds(["samtools", "index", "$int_dir/$base.sorted.bam"]);
+$runner->run(["samtools", "index", "$int_dir/$base.sorted.bam"]);
 
 my $ivar_file = "$int_dir/$base.ivar";
 
-run_cmds(["ivar",
+$runner->run(["ivar",
 	  "trim",
 	  "-e",
 	  "-q", 0,
@@ -211,15 +215,15 @@ run_cmds(["ivar",
 # Work around it with a timeout and rerun attempt.
 #
 
-run_cmds_with_timeout($opt->samtools_sort_timeout, ["samtools",
+$runner->run_with_timeout($opt->samtools_sort_timeout, ["samtools",
 						    "sort",
 						    "$ivar_file.bam",
 						    "--threads", $opt->threads,
 						    "-o", "$int_dir/$base.isorted.bam"]);
 
-run_cmds(["samtools", "index", "$int_dir/$base.isorted.bam"]);
+$runner->run(["samtools", "index", "$int_dir/$base.isorted.bam"]);
 
-run_cmds(["samtools",
+$runner->run(["samtools",
 	  "mpileup",
 	  "--fasta-ref", $reference,
 	  "--max-depth", $opt->max_depth,
@@ -234,7 +238,7 @@ my $pileup_compress_handle = start(["gzip", "-c", "$int_dir/$base.pileup"],
 				   '>',
 				   "$out_dir/$base.pileup.gz");
 
-run_cmds(["ivar",
+$runner->run(["ivar",
 	  "variants",
 	  "-p", $ivar_file,
 	  "-r", $reference,
@@ -243,7 +247,7 @@ run_cmds(["ivar",
 	 "<",
 	 "$int_dir/$base.pileup");
 
-run_cmds(["ivar",
+$runner->run(["ivar",
 	  "consensus",
 	  "-p", $ivar_file,
 	  "-m", $opt->min_depth,
@@ -252,7 +256,7 @@ run_cmds(["ivar",
 	 "<",
 	 "$int_dir/$base.pileup");
 
-run_cmds(["sed",
+$runner->run(["sed",
 	  '/>/ s/$/ | One Codex consensus sequence/'],
 	 "<",
 	 "$ivar_file.fa",
@@ -261,7 +265,7 @@ run_cmds(["sed",
 	 ">",
 	 "$out_dir/$base.fasta");
 
-run_cmds(["cat", $reference, "$out_dir/$base.fasta"],
+$runner->run(["cat", $reference, "$out_dir/$base.fasta"],
 	 '|',
 	 ["mafft", "--auto", "-"],
 	 '>',
@@ -272,7 +276,7 @@ run_cmds(["cat", $reference, "$out_dir/$base.fasta"],
 # Create coverage plot
 #
 
-run_cmds(["samtools", "depth", "$int_dir/$base.isorted.bam"], '>', "$out_dir/$base.depth");
+$runner->run(["samtools", "depth", "$int_dir/$base.isorted.bam"], '>', "$out_dir/$base.depth");
 
 if (-s "$out_dir/$base.depth")
 {
@@ -287,7 +291,7 @@ set output "$out_dir/$base.png"
 plot "$out_dir/$base.depth" using 2:3 with impulses title ""
 set output
 END
-    run_cmds(["gnuplot"], "<", \$plot);
+    $runner->run(["gnuplot"], "<", \$plot);
     };
 
     eval {
@@ -302,7 +306,7 @@ set output "$out_dir/$base.detail.png"
 plot "$out_dir/$base.depth" using 2:3 with impulses title ""
 set output
 END
-    run_cmds(["gnuplot"], "<", \$plot);
+    $runner->run(["gnuplot"], "<", \$plot);
     };
 
 
@@ -316,43 +320,4 @@ system("mv", "$ivar_file.tsv", "$out_dir/$base.variants.tsv");
 print STDERR "Waiting for pileup gzip to finish\n";
 $pileup_compress_handle->finish();
 
-sub run_cmds_with_timeout
-{
-    my($timeout, @cmds) = @_;
-
-    print STDERR "Execute with timeout=$timeout:\n";
-    for my $c (@cmds)
-    {
-	if (ref($c) eq 'ARRAY')
-	{
-	    print STDERR "\t@$c\n";
-	}
-	elsif(!ref($c))
-	{
-	    print STDERR "\t$c\n";
-	}
-    }
-
-    while (1)
-    {
-	my $start = gettimeofday;
-	my $ok = eval { run(@cmds, timeout($timeout)); };
-	my $end = gettimeofday;
-	my $elap = $end - $start;
-	print STDERR "Run returns $ok $? elapsed=$elap\n";
-	if ($@ =~ /IPC::Run/)
-	{
-	    warn "Run failed with IPC::Run error (retrying): $@";
-	    next;
-	}
-	if (! $ok)
-	{
-	    die "Failed running pipeline: \n" . Dumper(\@cmds);
-	}
-	else
-	{
-	    last;
-	}
-    }
-}
-
+print STDERR  JSON::XS->new->pretty(1)->canonical(1)->encode($runner->report);

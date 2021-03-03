@@ -137,16 +137,50 @@
 
 <h1>SARS2 Analysis Report for [% gto.scientific_name %]</h1>
 
-[% FOREACH var IN gto.computed_variants -%]
-[% IF var.tool == "pangolin" -%]
+[% FOREACH vset IN gto.computed_variants -%]
+[% IF vset.tool == "pangolin" -%]
 <h2>Pangolin Lineage</h2><p>
-Pangolin version [% var.tool_metadata.pangolin_version %] with 
-pangoLEARN version [% var.tool_metadata.pangoLEARN_version %] determined the
-lineage for this assembly to be <b>[% var.lineage %]</b> with a probability of [% var.probability %].
-<p>Pangolin status:  [% var.status %]
-[% IF var.notes -%]
-<p>Pangolin notes:  [% var.notes %]
+Pangolin version [% vset.tool_metadata.pangolin_version %] with 
+pangoLEARN version [% vset.tool_metadata.pangoLEARN_version %] determined the
+lineage for this assembly to be <b>[% vset.lineage %]</b> with a probability of [% vset.probability %].
+<p>Pangolin status:  [% vset.status %]
+[% IF vset.notes -%]
+<p>Pangolin notes:  [% vset.notes %]
 [% END -%]
+[% END -%]
+[% END -%]
+
+[% FOREACH vset IN gto.computed_variants -%]
+[% IF vset.tool == "assembly pipeline" -%]
+<h2>Protein SNPs from assembly</h2><p>
+
+<table border=1>
+<tr><th>Gene</th><th>SNPs</th></tr>
+[% FOREACH var IN vset.variants -%]
+[% IF var.gene == "S"  && var.snps.size() > 0 -%]
+<tr><td>[% var.gene %]</td>
+<td>
+[% FOR snp IN var.snps -%]
+[% IF snp.ref_aa && snp.alt_aa -%]
+[% snp.ref_aa %][% snp.feature_pos %][% snp.alt_aa %]
+[% END -%]
+[% END -%]
+</td>
+[% END -%]
+[% END -%]
+[% FOREACH var IN vset.variants -%]
+[% IF var.gene != "S"  && var.snps.size() > 0 -%]
+<tr><td>[% var.gene %]</td>
+<td>
+[% FOR snp IN var.snps -%]
+[% IF snp.ref_aa && snp.alt_aa -%]
+[% snp.ref_aa %][% snp.feature_pos %][% snp.alt_aa %]
+[% END -%]
+[% END -%]
+</td>
+[% END -%]
+[% END -%]
+</table>
 [% END -%]
 [% END -%]
 
@@ -210,7 +244,7 @@ No annotation was performed due to zero-length contig input.
 
 <p>
 
-[% IF gto.features.size == 0 -%]
+[% IF !gto.exists('features') || gto.features.size == 0 -%]
 No features were found.
 [% ELSE -%]
 <h2>Features annotated:</h2>
@@ -234,5 +268,20 @@ No features were found.
 </table>
 [% END -%]
 [% END -%]
+
+[% IF gto.sra_metadata.size() > 0 -%]
+<h2>SRA Metadata</h2><p>
+[% FOR m IN gto.sra_metadata -%]
+<h3>Accession [% m.accession %]</h3><p>
+<table border=1>
+<tr><th>Key</th><th>Value</th></tr>
+[% FOR key IN m.keys.sort -%]
+[% IF m.$key != "" -%]
+<tr><td>[% key %]</td><td>[% m.$key %]</td></tr>
+[% END -%]
+[% END -%]
+[% END -%]
+[% END -%]
+
 </body>
 </html>
