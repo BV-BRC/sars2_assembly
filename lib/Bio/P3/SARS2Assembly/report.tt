@@ -161,7 +161,7 @@ lineage for this assembly to be <em><b>[% vset.lineage %]</b></em> with a probab
 <tr><td>[% var.gene %]</td>
 <td>
 [% FOR snp IN var.snps -%]
-[% IF snp.ref_aa && snp.alt_aa -%]
+[% IF snp.ref_aa && snp.alt_aa && snp.ref_aa != "NA" && snp.alt_aa != "NA" -%]
 [% snp.ref_aa %][% snp.feature_pos %][% snp.alt_aa %]
 [% END -%]
 [% END -%]
@@ -173,7 +173,7 @@ lineage for this assembly to be <em><b>[% vset.lineage %]</b></em> with a probab
 <tr><td>[% var.gene %]</td>
 <td>
 [% FOR snp IN var.snps -%]
-[% IF snp.ref_aa && snp.alt_aa -%]
+[% IF snp.ref_aa && snp.alt_aa  && snp.ref_aa != "NA" && snp.alt_aa != "NA" -%]
 [% snp.ref_aa %][% snp.feature_pos %][% snp.alt_aa %]
 [% END -%]
 [% END -%]
