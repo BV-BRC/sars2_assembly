@@ -131,6 +131,10 @@ sub preflight
     my $est_storage = int(1.3e6 * $est_comp / 0.75);
 
     my $est_time = 3600 * 3;
+    if ($est_comp > 1000)
+    {
+	$est_time = 86400;
+    }
 
     return {
 	cpu => $est_cpu,
