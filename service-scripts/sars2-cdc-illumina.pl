@@ -197,7 +197,7 @@ if ($mode eq 'PE')
 		  "-1", $trim1,
 		  "-2", $trim2,
 		  "-S", $samfile);
-    $runner->run(\@bowtie);
+    $runner->run(\@bowtie, '2>', "$out_dir/bowtie2.err");
 }
 elsif ($mode eq 'SE')
 {
@@ -232,7 +232,7 @@ elsif ($mode eq 'SE')
 	      "-x", $reference,
 	      "-U", $trim,
 	      "-S", $samfile);
-    $runner->run(\@bowtie);
+    $runner->run(\@bowtie, '2>', "$out_dir/bowtie2.err");
 }
    
 #
