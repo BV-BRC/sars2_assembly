@@ -48,12 +48,12 @@ use gjoseqlib;
 use Bio::KBase::AppService::AppScript;
 use Bio::KBase::AppService::ReadSet;
 
-our %default_platform_recipe = (illumina => 'cdc-illumina',
-				nanopore => 'cdc-nanopore',
-				);
-#our %default_platform_recipe = (illumina => 'onecodex',
-#				nanopore => 'onecodex',
+#our %default_platform_recipe = (illumina => 'cdc-illumina',
+#				nanopore => 'cdc-nanopore',
 #				);
+our %default_platform_recipe = (illumina => 'onecodex',
+				nanopore => 'onecodex',
+				);
 our %valid_platform_recipe =
     (
      illumina => {
