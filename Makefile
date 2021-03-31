@@ -81,7 +81,11 @@ lib/Bio/P3/SARS2Assembly/primer_schemes:
 deploy: deploy-all
 deploy-all: deploy-client 
 deploy-client: deploy-libs deploy-scripts deploy-docs
-deploy-service: deploy-dir deploy-service-scripts
+deploy-service: deploy-dir deploy-service-scripts deploy-specs
+
+deploy-specs:
+	mkdir -p $(TARGET)/services/$(APP_SERVICE)
+	rsync -arv app_specs $(TARGET)/services/$(APP_SERVICE)/.
 
 deploy-service-scripts:
 	export KB_TOP=$(TARGET); \
