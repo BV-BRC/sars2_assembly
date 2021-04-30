@@ -84,6 +84,7 @@ sub pangolin
     my @data = split(/,/, $data);
     my $lin = $data[$idx{lineage}];
     my $prob = $data[$idx{probability}];
+    my $conflict = $data[$idx{conflict}];
     my $status = $data[$idx{status}];
     my $learn_vers = $data[$idx{pangoLEARN_version}];
     my $note = $data[$idx{note}];
@@ -112,6 +113,7 @@ sub pangolin
 	variants => [],
 	lineage => $lin,
 	probability => $prob,
+	conflict => $conflict,
 	status => $status,
 	notes => $note,
     };

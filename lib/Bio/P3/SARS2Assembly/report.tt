@@ -142,7 +142,12 @@
 <h2>Pangolin Lineage</h2><p>
 Pangolin version [% vset.tool_metadata.pangolin_version %] with 
 pangoLEARN version [% vset.tool_metadata.pangoLEARN_version %] determined the
-lineage for this assembly to be <em><b>[% vset.lineage %]</b></em> with a probability of [% vset.probability %].
+lineage for this assembly to be <em><b>[% vset.lineage %]</b></em>
+[% IF  vset.probability -%]
+with a probability of [% vset.probability %].
+[% ELSIF  vset.conflict -%]
+with a conflict of [% vset.conflict %].
+[% END -%]
 <p>Pangolin status:  [% vset.status %]
 [% IF vset.notes -%]
 <p>Pangolin notes:  [% vset.notes %]
