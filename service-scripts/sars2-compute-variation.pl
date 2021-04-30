@@ -83,8 +83,8 @@ sub pangolin
     chomp $data;
     my @data = split(/,/, $data);
     my $lin = $data[$idx{lineage}];
-    my $prob = $data[$idx{probability}];
-    my $conflict = $data[$idx{conflict}];
+    my $prob = $data[$idx{probability}] if defined($idx{probability});
+    my $conflict = $data[$idx{conflict}] if defined($idx{conflict});
     my $status = $data[$idx{status}];
     my $learn_vers = $data[$idx{pangoLEARN_version}];
     my $note = $data[$idx{note}];
