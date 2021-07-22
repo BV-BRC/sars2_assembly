@@ -1,3 +1,5 @@
+SHELL = /bin/bash -O extglob -c
+
 TOP_DIR = ../..
 include $(TOP_DIR)/tools/Makefile.common
 
@@ -5,6 +7,8 @@ DEPLOY_RUNTIME ?= /kb/runtime
 TARGET ?= /kb/deployment
 
 APP_SERVICE = app_service
+
+ARTIC_COMMIT_HASH = 335ead0d7cdb4544c17c9dd51491c531878a91cf
 
 WRAP_PYTHON_TOOL = wrap_python3
 WRAP_PYTHON_SCRIPT = bash $(TOOLS_DIR)/$(WRAP_PYTHON3_TOOL).sh
@@ -68,13 +72,14 @@ artic_schemes: lib/Bio/P3/SARS2Assembly/primer_schemes
 lib/Bio/P3/SARS2Assembly/primer_schemes:
 	rm -rf artic-ncov2019
 	git clone https://github.com/artic-network/artic-ncov2019.git
-	cd artic-ncov2019; git checkout 335ead0d7cdb4544c17c9dd51491c531878a91cf
+	cd artic-ncov2019; git checkout $(ARTIC_COMMIT_HASH)
 	cp -r artic-ncov2019/primer_schemes lib/Bio/P3/SARS2Assembly
 	cd lib/Bio/P3/SARS2Assembly; \
 	for s in primer_schemes/nCoV-2019/V*; do \
 	   (cd $$s; \
 	   perl -ne 'my @x=split m/\t/; print join("\t",@x[0..3], 60, $x[3]=~m/LEFT/?"+":"-"),"\n";' \
-		nCoV-2019.scheme.bed) > ARTIC-`basename $$s`.bed; \
+		?(nCoV-2019|SARS-CoV-2).scheme.bed > ARTIC-`basename $$s`.bed; \
+	  ); \
 	done
 
 

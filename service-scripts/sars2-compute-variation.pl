@@ -105,6 +105,7 @@ sub pangolin
     my $tool_md = {
 	pangoLEARN_version => $learn_vers,
 	pangolin_version => $p_vers,
+	pango_version => $data[$idx{pango_version}],
     };
 
     my $var = {

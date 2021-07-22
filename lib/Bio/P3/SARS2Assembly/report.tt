@@ -140,18 +140,32 @@
 [% FOREACH vset IN gto.computed_variants -%]
 [% IF vset.tool == "pangolin" -%]
 <h2>Pangolin Lineage</h2><p>
-Pangolin version [% vset.tool_metadata.pangolin_version %] with 
-pangoLEARN version [% vset.tool_metadata.pangoLEARN_version %] determined the
+We analyzed this genome with Pangolin version [% vset.tool_metadata.pangolin_version %] with 
+pangoLEARN version [% vset.tool_metadata.pangoLEARN_version %]  and
+pango version [% vset.tool_metadata.pango_version %].
+[% IF vset.linage == "None" -%]
+No lineage was able to be computed.
+[% ELSE -%]
+Pangolin determined the
 lineage for this assembly to be <em><b>[% vset.lineage %]</b></em>
-[% IF  vset.probability -%]
+[% IF  vset.probability.defined -%]
 with a probability of [% vset.probability %].
-[% ELSIF  vset.conflict -%]
+[% ELSIF  vset.conflict.defined -%]
 with a conflict of [% vset.conflict %].
 [% END -%]
+[% END -%]
+[% IF vset.ambiguity_score.defined -%]
+The ambiguity score is [% vset.ambiguity_score %].
+[% END -%]
 <p>Pangolin status:  [% vset.status %]
-[% IF vset.notes -%]
+[% IF vset.notes.defined -%]
 <p>Pangolin notes:  [% vset.notes %]
 [% END -%]
+[% IF vset.note.defined -%]
+<p>Pangolin notes:  [% vset.note %]
+[% END -%]
+<p>You can read more about the Pangolin output data at 
+<a href="https://cov-lineages.org/pangolin_docs/output.html">the pangolin documentation site</a>.
 [% END -%]
 [% END -%]
 
