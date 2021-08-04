@@ -200,13 +200,18 @@ unlink("$int_dir/minimap.out");
 $runner->run(["samtools", "index", "$int_dir/$base.sorted.bam"]);
 
 my $ivar_file = "$int_dir/$base.ivar";
+my $bed_file = artic_bed($opt->artic_version);
+if (! -f $bed_file)
+{
+    die "Bed file $bed_file is missing\n";
+}
 
 $runner->run(["ivar",
 	  "trim",
 	  "-e",
 	  "-q", 0,
 	  "-i", "$int_dir/$base.sorted.bam",
-	  "-b", artic_bed($opt->artic_version),
+	  "-b", $bed_file,
 	  "-p", $ivar_file]);
 
 #
