@@ -87,7 +87,16 @@ sub artic_primer_schemes_path
 sub artic_reference
 {
     my($vers) = @_;
-    my $ref = mpath() . "/$ArticSchemes/nCoV-2019/V$vers/nCoV-2019.reference.fasta";
+    my $fname;
+    if ($vers <= 3)
+    {
+	$fname = "nCoV-2019.reference.fasta";
+    }
+    else
+    {
+	$fname = "SARS-CoV-2.reference.fasta";
+    }
+    my $ref = mpath() . "/$ArticSchemes/nCoV-2019/V$vers/$fname";
     return $ref;
 }
 

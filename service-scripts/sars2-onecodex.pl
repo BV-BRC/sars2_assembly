@@ -83,7 +83,7 @@ for my $i (0 .. $n1 - 1)
     push(@inputs, $opt->pe_read_1->[$i], $opt->pe_read_2->[$i]);
 }
 
-my %artic_versions = (1 => 1, 2 => 1, 3 => 1);
+my %artic_versions = (1 => 1, 2 => 1, 3 => 1, 4 => 1);
 if (!$artic_versions{$opt->artic_version})
 {
     die "Invalid artic version\n";
