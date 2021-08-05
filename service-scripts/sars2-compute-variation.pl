@@ -85,6 +85,7 @@ sub pangolin
     my $lin = $data[$idx{lineage}];
     my $prob = $data[$idx{probability}] if defined($idx{probability});
     my $conflict = $data[$idx{conflict}] if defined($idx{conflict});
+    my $pango_vers = $data[$idx{pango_version}] if defined($idx{pango_version});
     my $status = $data[$idx{status}];
     my $learn_vers = $data[$idx{pangoLEARN_version}];
     my $note = $data[$idx{note}];
@@ -100,12 +101,12 @@ sub pangolin
 	$p_vers =~ s/^pang\S+\s+//;
     }
 
-    print "lin=$lin prob=$prob status=$status\n";
+    print STDERR "lin=$lin prob=$prob status=$status\n";
 
     my $tool_md = {
 	pangoLEARN_version => $learn_vers,
 	pangolin_version => $p_vers,
-	pango_version => $data[$idx{pango_version}],
+	pango_version => $pango_vers,
     };
 
     my $var = {
@@ -139,7 +140,7 @@ sub get_blast_variants
 	       "-r",
 	       "-q", $spike,
 	       "-s", $contigs_file);
-    print "@cmd\n";
+    print STDERR "@cmd\n";
     my $ok = run(\@cmd, ">", \$out, '2>', \$err);
     my $nohits;
     if (!$ok)
@@ -166,7 +167,6 @@ sub get_blast_variants
     open(M, "<", \$out);
     while (<M>)
     {
-	print ;
 	chomp;
 	my($id, $frame, $ins, $var) = split(/\t/);
 	my @ins = split(/,/, $ins);
