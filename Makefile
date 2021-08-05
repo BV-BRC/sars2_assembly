@@ -51,7 +51,7 @@ reference: lib/Bio/P3/SARS2Assembly/MN908947.fasta.fai lib/Bio/P3/SARS2Assembly/
 #
 lib/Bio/P3/SARS2Assembly/MN908947.fasta.fai: lib/Bio/P3/SARS2Assembly/MN908947.fasta
 	-bowtie2-build  lib/Bio/P3/SARS2Assembly/MN908947.fasta lib/Bio/P3/SARS2Assembly/MN908947.fasta
-	-$(KB_RUNTIME)/samtools-1.9/bin/samtools faidx lib/Bio/P3/SARS2Assembly/MN908947.fasta
+	-$(KB_RUNTIME)/samtools-1.11/bin/samtools faidx lib/Bio/P3/SARS2Assembly/MN908947.fasta
 
 primer: lib/Bio/P3/SARS2Assembly/SC2_200324.bedpe
 
@@ -77,7 +77,7 @@ lib/Bio/P3/SARS2Assembly/primer_schemes:
 	cd lib/Bio/P3/SARS2Assembly; \
 	for s in primer_schemes/nCoV-2019/V*; do \
 	   (cd $$s; \
-	    $(KB_RUNTIME)/samtools-1.9/bin/samtools faidx *reference.fasta;  \
+	    $(KB_RUNTIME)/samtools-1.11/bin/samtools faidx *reference.fasta;  \
 	   perl -ne 'my @x=split m/\t/; print join("\t",@x[0..3], 60, $x[3]=~m/LEFT/?"+":"-"),"\n";' \
 		?(nCoV-2019|SARS-CoV-2).scheme.bed) > ARTIC-`basename $$s`.bed; \
 	done
