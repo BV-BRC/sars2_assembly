@@ -13,6 +13,7 @@ use GenomeTypeObject;
 use Bio::P3::SARS2Assembly qw(reference_spike_aa_path mpath add_variants_to_gto add_quality_estimate_to_gto);
 use Getopt::Long::Descriptive;
 use IPC::Run qw(run);
+use Text::CSV qw(csv);
 
 my($opt, $usage) = describe_options("%c %o",
 				    ["variants=s" => "Add variants.tsv from assembly"],
@@ -65,59 +66,53 @@ sub pangolin
 	return;
     }
 
-    if (!open(LIN, "<", $out))
+    my $lin_fh;
+    if (!open($lin_fh, "<", $out))
     {
 	warn "Cannot open pangolin lineage output $out: $!";
 	return;
     }
 
-    my $hdr = <LIN>;
-    chomp $hdr;
-    my @keys = split(/,/, $hdr);
-    my %idx;
-    for my $i (0..$#keys)
+    my $res = csv(in => $lin_fh, headers => 'auto');
+    if (@$res == 0)
     {
-	$idx{$keys[$i]} = $i;
+	warn "Could not read headers from $out\n";
+	return;
     }
-    my $data = <LIN>;
-    chomp $data;
-    my @data = split(/,/, $data);
-    my $lin = $data[$idx{lineage}];
-    my $prob = $data[$idx{probability}] if defined($idx{probability});
-    my $conflict = $data[$idx{conflict}] if defined($idx{conflict});
-    my $pango_vers = $data[$idx{pango_version}] if defined($idx{pango_version});
-    my $status = $data[$idx{status}];
-    my $learn_vers = $data[$idx{pangoLEARN_version}];
-    my $note = $data[$idx{note}];
+
+    my $lin = $res->[0];
     
     #
     # look up pangolin version
     #
     my $p_vers;
-    my $ok = run(["pangolin", "-v"], ">", \$p_vers);
-    if ($ok)
+    if (!$lin->{pangolin_version})
     {
-	chomp $p_vers;
-	$p_vers =~ s/^pang\S+\s+//;
+	my $ok = run(["pangolin", "-v"], ">", \$p_vers);
+	if ($ok)
+	{
+	    chomp $p_vers;
+	    $p_vers =~ s/^pang\S+\s+//;
+	}
     }
 
-    print STDERR "lin=$lin prob=$prob status=$status\n";
-
     my $tool_md = {
-	pangoLEARN_version => $learn_vers,
-	pangolin_version => $p_vers,
-	pango_version => $pango_vers,
+	pangoLEARN_version => $lin->{pangoLEARN_version},
+	pangolin_version => ($lin->{pangolin_version} // $p_vers),
+	pango_version => $lin->{pango_version},
+	version => $lin->{version},
     };
 
     my $var = {
 	tool => 'pangolin',
+	tool_output => $lin,
 	tool_metadata => $tool_md,
 	variants => [],
-	lineage => $lin,
-	probability => $prob,
-	conflict => $conflict,
-	status => $status,
-	notes => $note,
+	lineage => $lin->{lineage},
+	probability => $lin->{probability},
+	conflict => $lin->{conflict},
+	status => $lin->{status},
+	notes => $lin->{note},
     };
 
     push(@{$gto->{computed_variants}}, $var);
