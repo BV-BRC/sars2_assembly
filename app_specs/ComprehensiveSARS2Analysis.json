@@ -138,10 +138,11 @@
       "desc": "Recipe used for assembly",
       "type": "enum",
       "enum": [
-        "auto",
-	"cdc-illumina",
-	"cdc-nanopore",
-	"artic-nanopore"
+          "auto",
+	  "onecodex",
+	  "cdc-illumina",
+	  "cdc-nanopore",
+	  "artic-nanopore"
       ]
     },
     {
