@@ -227,7 +227,7 @@ style="border-width: 2px; border-style: solid;"/>
 [% END -%]
 [% IF vcf_tabular -%]
 <h2>Variation data:</h2>
-<table>
+<table border=1>
 <tr>
 [% FOR k IN vcf_tabular.0 -%]
 <th>[% k %]</th>
