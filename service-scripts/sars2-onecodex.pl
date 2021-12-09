@@ -46,7 +46,7 @@ my($opt, $usage) = describe_options("%c %o output-base output-dir",
 				    ["nanopore" => "Force use of nanopore mapping method"],
 				    ["keep-intermediates|k" => "Save all intermediate files"],
 				    ["delete-reads" => "Delete reads when they have been processed"],
-				    ["samtools-sort-timeout=i" => "Timeout for samtools sort", { default => 120 }],
+				    ["samtools-sort-timeout=i" => "Timeout for samtools sort", { default => 960 }],
 				    ["help|h"      => "Show this help message"],
 				    );
 
@@ -182,7 +182,7 @@ if ($opt->delete_reads)
     unlink(@inputs);
 }
 
-$runner->run_with_timeout(240, ["samtools",
+$runner->run_with_timeout(960, ["samtools",
 			    "view",
 			    "-u",
 			    "-h",
