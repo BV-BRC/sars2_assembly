@@ -8,7 +8,8 @@ TARGET ?= /kb/deployment
 
 APP_SERVICE = app_service
 
-ARTIC_COMMIT_HASH = b3f2dda5e6d95bc1c5d95a04d4ef37d304479477
+PRIMER_SCHEMES_REPO = https://github.com/BV-BRC/primer-schemes
+PRIMER_SCHEMES_COMMIT_HASH = HEAD
 
 WRAP_PYTHON_TOOL = wrap_python3
 WRAP_PYTHON_SCRIPT = bash $(TOOLS_DIR)/$(WRAP_PYTHON3_TOOL).sh
@@ -70,10 +71,10 @@ artic_schemes: lib/Bio/P3/SARS2Assembly/primer_schemes
 #
 
 lib/Bio/P3/SARS2Assembly/primer_schemes:
-	rm -rf artic-ncov2019
-	git clone https://github.com/artic-network/artic-ncov2019.git
-	cd artic-ncov2019; git checkout $(ARTIC_COMMIT_HASH)
-	cp -r artic-ncov2019/primer_schemes lib/Bio/P3/SARS2Assembly
+	rm -rf primer-schemes
+	git clone $(PRIMER_SCHEMES_REPO) primer-schemes
+	cd primer-schemes; git checkout $(PRIMER_SCHEMES_COMMIT_HASH)
+	cp -r primer-schemes lib/Bio/P3/SARS2Assembly/primer_schemes
 	cd lib/Bio/P3/SARS2Assembly; \
 	for s in primer_schemes/nCoV-2019/V*; do \
 	   (cd $$s; \

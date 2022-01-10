@@ -22,15 +22,30 @@ The generated FASTA consensus sequence is written to output-dir/output-base.fast
 use strict;
 use Getopt::Long::Descriptive;
 use IPC::Run qw(run timeout start);
-use Bio::P3::SARS2Assembly qw(artic_reference artic_bed run_cmds reference_gff_path);
+use Bio::P3::SARS2Assembly qw(manifest artic_reference artic_bed run_cmds reference_gff_path artic_primer_schemes_path);
 use JSON::XS;
 use Data::Dumper;
 use File::Basename;
 use File::Temp;
+use File::Slurp;
 use Time::HiRes 'gettimeofday';
+use gjoseqlib;
 use Bio::P3::CmdRunner;
+use PDL;
+use PDL::Stats::Basic;
+use PDL::Ufunc;
 
 $ENV{PATH} = "$ENV{KB_RUNTIME}/samtools-1.11/bin:$ENV{KB_RUNTIME}/bcftools-1.9/bin:$ENV{PATH}";
+
+#
+# The manifest file holds the definitions of the available organisms and primer sets. Use it to
+# validate the primer chosen by the user (and to list the available primer sets).
+#
+
+my $manifest = decode_json(scalar read_file(manifest));
+my($primer_info) = grep { $_->{name} = "SARS-CoV-2" } @{$manifest->{organisms}};
+my $primers = $primer_info->{primers};
+my @primer_names = sort keys %$primers;
 
 my($opt, $usage) = describe_options("%c %o output-base output-dir",
 				    ['pe-read-1|1=s@' => "Paired-end mate 1 file", { default => [] }],
@@ -41,7 +56,8 @@ my($opt, $usage) = describe_options("%c %o output-base output-dir",
 				    ["min-quality|q=i" => "Minimum read quality", { default => 20 }],
 				    ["max-depth|d=i" => "Maxmium depth to use in mpileup", { default => 0 }],
 				    ["min-depth|D=i" => "Minimum depth for consensus base call", { default => 3 }],
-				    ["artic-version|a=i" => "ARTIC primer version", { default => 3}],
+				    ["primers=s" => "Use these primers. Choices are @primer_names"],
+				    ["primer-version=s" => "Use the specfiied version of the chosen primers. Default is the latest available version"],
 				    ["length-threshold|l=i" => "Max length to be considered short read sequencing", { default => 600 }],
 				    ["nanopore" => "Force use of nanopore mapping method"],
 				    ["keep-intermediates|k" => "Save all intermediate files"],
@@ -53,6 +69,56 @@ my($opt, $usage) = describe_options("%c %o output-base output-dir",
 
 print($usage->text), exit 0 if $opt->help;
 die($usage->text) unless @ARGV == 2;
+
+$opt->primers or die "Primers must be defined using the --primers flag. Available primers are @primer_names\n";
+
+#
+# Find our primer data.
+#
+my $primer = $primers->{$opt->primers};
+$primer or die "Chosen primers " . $opt->primers . " not available\n";
+
+my $scheme;
+my $schemes = $primer->{schemes};
+if ($opt->primer_version)
+{
+    ($scheme) = grep { $_->{version} eq $opt->primer_version } @$schemes;
+    if (!$scheme)
+    {
+	my @avail = map { $_->{version} } @$schemes;
+	die "Version " . $opt->primer_version . " not available for primers " . $opt->primers . ". Available versions: @avail\n";
+    }
+}
+else
+{
+    $scheme = $schemes->[-1];
+}
+
+my @stats;
+
+my $path = artic_primer_schemes_path . "/$primer->{path}/$scheme->{version}";
+my $reference = "$path/$scheme->{reference}";
+-f $reference or die "Cannot read reference $reference\n";
+     
+my $bed_file = "$path/$scheme->{primers}";
+if (! -f $bed_file)
+{
+    die "Bed file $bed_file is missing\n";
+}
+my $bed_tmp = File::Temp->new;
+open(I, "<", $bed_file) or die "cannot read $bed_file: $!\n";
+while (<I>)
+{
+    my @x = split m/\t/;
+    print $bed_tmp join("\t", @x[0..3], 60, $x[3]=~m/LEFT/ ? "+" : "-"), "\n";
+}
+close(I);
+close($bed_tmp);
+
+push(@stats,
+     [reference => $reference],
+     [primers => $bed_file],
+     );
 
 my $runner = Bio::P3::CmdRunner->new;
 
@@ -83,12 +149,6 @@ for my $i (0 .. $n1 - 1)
     push(@inputs, $opt->pe_read_1->[$i], $opt->pe_read_2->[$i]);
 }
 
-my %artic_versions = (1 => 1, 2 => 1, 3 => 1, 4 => 1);
-if (!$artic_versions{$opt->artic_version})
-{
-    die "Invalid artic version\n";
-}
- 
 #
 # Set output directories
 #
@@ -158,8 +218,6 @@ my @minimap_opts = (-K => "20M", 	# Minibatch size
 		    -t => $opt->threads);
 
 # Trim polyA tail for alignment (33 bases)
-my $reference = artic_reference($opt->artic_version);
--f $reference or die "Cannot read reference $reference\n";
 my $trimmed = "$int_dir/reference_trimmed.fa";
 
 my $ok = $runner->run(["seqtk", "trimfq", "-e", 33, $reference], '>',  $trimmed);
@@ -200,19 +258,63 @@ unlink("$int_dir/minimap.out");
 $runner->run(["samtools", "index", "$int_dir/$base.sorted.bam"]);
 
 my $ivar_file = "$int_dir/$base.ivar";
-my $bed_file = artic_bed($opt->artic_version);
-if (! -f $bed_file)
-{
-    die "Bed file $bed_file is missing\n";
-}
 
 $runner->run(["ivar",
 	  "trim",
 	  "-e",
 	  "-q", 0,
 	  "-i", "$int_dir/$base.sorted.bam",
-	  "-b", $bed_file,
-	  "-p", $ivar_file]);
+	  "-b", "$bed_tmp",
+	  "-p", $ivar_file],
+	    '>', "$out_dir/$base.primer-trim.txt");
+
+#
+# Read the primer trimming report and extract primer-trim.tbl
+#
+if (open(T, "<", "$out_dir/$base.primer-trim.txt"))
+{
+    while (<T>)
+    {
+	last if (/^Primer Name.*Read Count/);
+	if (/Found\s+(\d+)\s+mapped/)
+	{
+	    push(@stats, [mapped_reads => $1]);
+	}
+	if (/Found\s+(\d+)\s+unmapped/)
+	{
+	    push(@stats, [unmapped_reads => $1]);
+	}
+	if (/Found\s+(\d+)\s+primers/)
+	{
+	    push(@stats, [primer_count => $1]);
+	}
+    }
+    if ($_)
+    {
+	if (open(O, ">", "$out_dir/$base.primer-trim.tbl"))
+	{
+	    print O $_;
+	    while (<T>)
+	    {
+		last unless /\t/;
+		print O $_;
+	    }
+	    while (<T>)
+	    {
+		if (/Trimmed\s+primers\s+from\s+(\S+)%\s+\((\d+)/)
+		{
+		    push(@stats,
+			 [primer_trim_count => $2],
+			 [primer_trim_pct => $1]);
+		}
+	    }
+			
+	    close(O);
+	}
+    }
+    close(T);
+}
+    
 
 #
 # We are hitting seemingly random timeouts on Bebop with this sort.
@@ -321,6 +423,54 @@ system("mv", "$int_dir/$base.isorted.bam", "$out_dir/$base.sorted.bam");
 system("mv", "$int_dir/$base.isorted.bam.bai", "$out_dir/$base.sorted.bam.bai");
 #system("gzip", "-f", "$out_dir/$base.pileup");
 system("mv", "$ivar_file.tsv", "$out_dir/$base.variants.tsv");
+
+#
+# Compute some statistics
+#
+
+open(S, ">", "$out_dir/$base.statistics.tsv") or die "Cannot write $out_dir/$base.statistics.tsv: $!";
+
+eval {
+    my($depth_vals) = rcols("$out_dir/$base.depth", 2);
+
+    printf S "depth_mean\t%.1f\n", $depth_vals->avg();
+    printf S "depth_median\t%.1f\n", $depth_vals->median();
+    printf S "depth_stdv\t%.1f\n", $depth_vals->stdv();
+    printf S "depth_min\t%d\n", $depth_vals->min();
+    printf S "depth_max\t%d\n", $depth_vals->max();
+
+    open(F, "<", "$out_dir/$base.fasta") or die "Cannot open $out_dir/$base.fasta: $!";
+    my($id, $def, $seq) = read_next_fasta_seq(\*F);
+    close(F);
+    my $nblocks = 0;
+    my $ncount = 0;
+    while ($seq =~ /([nN]+)/g)
+    {
+	$nblocks++;
+	$ncount += length($1);
+    }
+
+    print S "n_count\t$ncount\n";
+    print S "n_count\t$ncount\n";
+    print S "fasta_length\t" . length($seq) . "\n";
+
+    print S join("\t", @$_) . "\n" foreach @stats;
+
+    open(V, "<", "$out_dir/$base.variants.tsv") or die "Cannot open $out_dir/$base.variants.tsv: $!";
+    my $vc = 0;
+    $_ = <V>;
+    $vc++ while (<V>);
+    close(V);
+    print S "variant_count\t$vc\n";
+    
+    
+    close(S);
+};
+if ($@)
+{
+    warn "Error processing statistics: $@";
+}
+    
 
 print STDERR "Waiting for pileup gzip to finish\n";
 $pileup_compress_handle->finish();
