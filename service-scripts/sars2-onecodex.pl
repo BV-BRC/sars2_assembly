@@ -56,6 +56,8 @@ my($opt, $usage) = describe_options("%c %o output-base output-dir",
 				    ["min-quality|q=i" => "Minimum read quality", { default => 20 }],
 				    ["max-depth|d=i" => "Maxmium depth to use in mpileup", { default => 0 }],
 				    ["min-depth|D=i" => "Minimum depth for consensus base call", { default => 3 }],
+				    ["bed-file=s" => "Use the given primer BED file. The --reference parameter must also be specified"],
+				    ["reference=s" => "Use the given reference FASTA file. THe --bed-file parameter must also be specified"],
 				    ["primers=s" => "Use these primers. Choices are @primer_names"],
 				    ["primer-version=s" => "Use the specfiied version of the chosen primers. Default is the latest available version"],
 				    ["length-threshold|l=i" => "Max length to be considered short read sequencing", { default => 600 }],
@@ -72,35 +74,53 @@ die($usage->text) unless @ARGV == 2;
 
 $opt->primers or die "Primers must be defined using the --primers flag. Available primers are @primer_names\n";
 
-#
-# Find our primer data.
-#
-my $primer = $primers->{$opt->primers};
-$primer or die "Chosen primers " . $opt->primers . " not available\n";
-
-my $scheme;
-my $schemes = $primer->{schemes};
-if ($opt->primer_version)
+my($reference, $bed_file);
+if ($opt->bed_file || $opt->reference)
 {
-    ($scheme) = grep { $_->{version} eq $opt->primer_version } @$schemes;
-    if (!$scheme)
+    if (!$opt->bed_file || !$opt->reference)
     {
-	my @avail = map { $_->{version} } @$schemes;
-	die "Version " . $opt->primer_version . " not available for primers " . $opt->primers . ". Available versions: @avail\n";
+	die "If either of --bed-file or --reference is specfied, both must be specified\n";
     }
+    if ($opt->primers)
+    {
+	die "Primers may be specified by only one of --bed-file and --primers\n";
+    }
+
+    $reference = $opt->reference;
+    $bed_file = $opt->bed_file;
 }
 else
 {
-    $scheme = $schemes->[-1];
+    #
+    # Find our primer data.
+    #
+    my $primer = $primers->{$opt->primers};
+    $primer or die "Chosen primers " . $opt->primers . " not available\n";
+    
+    my $scheme;
+    my $schemes = $primer->{schemes};
+    if ($opt->primer_version)
+    {
+	($scheme) = grep { $_->{version} eq $opt->primer_version } @$schemes;
+	if (!$scheme)
+	{
+	    my @avail = map { $_->{version} } @$schemes;
+	    die "Version " . $opt->primer_version . " not available for primers " . $opt->primers . ". Available versions: @avail\n";
+	}
+    }
+    else
+    {
+	$scheme = $schemes->[-1];
+    }
+    
+    my $path = artic_primer_schemes_path . "/$primer->{path}/$scheme->{version}";
+    $reference = "$path/$scheme->{reference}";
+    $bed_file = "$path/$scheme->{primers}";
+
 }
 
-my @stats;
-
-my $path = artic_primer_schemes_path . "/$primer->{path}/$scheme->{version}";
-my $reference = "$path/$scheme->{reference}";
 -f $reference or die "Cannot read reference $reference\n";
-     
-my $bed_file = "$path/$scheme->{primers}";
+    
 if (! -f $bed_file)
 {
     die "Bed file $bed_file is missing\n";
@@ -114,6 +134,8 @@ while (<I>)
 }
 close(I);
 close($bed_tmp);
+
+my @stats;
 
 push(@stats,
      [reference => $reference],
@@ -451,7 +473,7 @@ eval {
     }
 
     print S "n_count\t$ncount\n";
-    print S "n_count\t$ncount\n";
+    print S "n_blocks\t$nblocks\n";
     print S "fasta_length\t" . length($seq) . "\n";
 
     print S join("\t", @$_) . "\n" foreach @stats;

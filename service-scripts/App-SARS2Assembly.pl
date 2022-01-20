@@ -384,6 +384,14 @@ sub assemble
     
     push(@params, "-j", $cpu) if $cpu;
 
+    #
+    # Onecodex requires primers. Set to ARTIC v4 until we get full app integration
+    #
+    if ($recipe eq 'onecodex')
+    {
+	push(@params, "--primers", "ARTIC", "--version", "V4");
+    }
+
     # Onecodex & CDC illumina recipes supports min read depth parameter
     if (($recipe eq 'onecodex' || $recipe eq 'cdc-illumina') && $params->{min_depth} > 0)
     {
