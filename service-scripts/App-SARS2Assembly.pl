@@ -389,7 +389,7 @@ sub assemble
     #
     if ($recipe eq 'onecodex')
     {
-	push(@params, "--primers", "ARTIC", "--version", "V4");
+	push(@params, "--primers", "ARTIC", "--primer-version", "V4");
     }
 
     # Onecodex & CDC illumina recipes supports min read depth parameter
