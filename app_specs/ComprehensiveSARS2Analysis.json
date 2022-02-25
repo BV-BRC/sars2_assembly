@@ -145,6 +145,22 @@
 	  "artic-nanopore"
       ]
     },
+      {
+	  "id": "primers",
+	  "label": "Primer set to use for assembly",
+	  "desc": "Primer set to use for assembly",
+	  "required": 1,
+	  "default": "ARTIC",
+	  "type": "enum",
+	  "enum": ["ARTIC", "midnight", "qiagen", "swift", "varskip", "varskip-long"]
+      },
+      {
+	  "id": "primer_version",
+	  "label": "Version number for primer",
+	  "desc": "Version number for primer",
+	  "required": 0,
+	  "type": "string"
+      },
     {
       "id": "min_depth",
       "label": "Minimum depth to add to consensus",

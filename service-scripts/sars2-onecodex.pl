@@ -120,7 +120,8 @@ else
 }
 
 -f $reference or die "Cannot read reference $reference\n";
-    
+
+print STDERR "Processing bed file $bed_file\n";
 if (! -f $bed_file)
 {
     die "Bed file $bed_file is missing\n";
@@ -130,7 +131,9 @@ open(I, "<", $bed_file) or die "cannot read $bed_file: $!\n";
 while (<I>)
 {
     my @x = split m/\t/;
-    print $bed_tmp join("\t", @x[0..3], 60, $x[3]=~m/LEFT/ ? "+" : "-"), "\n";
+    my $l = join("\t", @x[0..3], 60, $x[3]=~m/LEFT/ ? "+" : "-") . "\n";
+    print $bed_tmp $l;
+    print STDERR $l;
 }
 close(I);
 close($bed_tmp);
