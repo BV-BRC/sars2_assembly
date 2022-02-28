@@ -130,8 +130,9 @@ my $bed_tmp = File::Temp->new;
 open(I, "<", $bed_file) or die "cannot read $bed_file: $!\n";
 while (<I>)
 {
+    chomp;
     my @x = split m/\t/;
-    my $l = join("\t", @x[0..3], 60, $x[3]=~m/LEFT/ ? "+" : "-") . "\n";
+    my $l = join("\t", @x[0..3], 60, $x[3]=~m/LEFT|(F$)/ ? "+" : "-") . "\n";
     print $bed_tmp $l;
     print STDERR $l;
 }
