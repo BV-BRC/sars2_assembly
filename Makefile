@@ -82,10 +82,11 @@ lib/Bio/P3/SARS2Assembly/primer_schemes:
 		?(nCoV-2019|SARS-CoV-2).scheme.bed) > ARTIC-`basename $$s`.bed; \
 	done
 	cd lib/Bio/P3/SARS2Assembly; \
-	if [[ -x $(KB_RUNTIME)/samtools-1.11/bin/samtools ]] ; then
-	for fa in primer_schemes/*/V*/*reference.fasta; do \
-		 $(KB_RUNTIME)/samtools-1.11/bin/samtools faidx $$fa; \
-	done ; fi
+	if [[ -x $(KB_RUNTIME)/samtools-1.11/bin/samtools ]] ; then \
+		for fa in primer_schemes/*/V*/*reference.fasta; do \
+			 $(KB_RUNTIME)/samtools-1.11/bin/samtools faidx $$fa; \
+		done \
+	fi
 
 
 deploy: deploy-all
