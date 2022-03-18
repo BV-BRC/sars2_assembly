@@ -586,6 +586,10 @@ sub generate_report
 						 1, 1, $self->token->token);
     }
     
+    return {
+	gto_path => $saved_genome,
+	genome_id => $gto->{id},
+    };
 }
 
 sub await_task_completion
