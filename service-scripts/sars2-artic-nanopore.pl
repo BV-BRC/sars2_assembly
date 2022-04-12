@@ -23,6 +23,7 @@ use File::Copy qw(move);
 use File::Temp;
 
 my($opt, $usage) = describe_options("%c %o reads output-base output-dir",
+				    ['se-read|U=s' => "Single-end read file"],
 				    ["output-name|n=s" => "Output name for sequence (in the fasta file). Defaults to output-base"],
 				    ["scheme=s" => "Artic scheme", { default => "nCoV-2019/V3" }],
 				    ["threads|j=i" => "Number of threads to use", { default => 1 }],
@@ -31,9 +32,23 @@ my($opt, $usage) = describe_options("%c %o reads output-base output-dir",
 				    );
 
 print($usage->text), exit 0 if $opt->help;
-die($usage->text) unless @ARGV == 3;
 
-my $fastqfile = shift;
+my $fastqfile;
+
+#
+# compatibility fix for new --se-read option.
+#
+if ($opt->se_read)
+{
+    $fastqfile = $opt->se_read;
+    die($usage->text) unless @ARGV == 2;
+}
+else
+{
+    die($usage->text) unless @ARGV == 3;
+    $fastqfile = shift;
+}
+
 my $base = shift;
 my $out_dir = shift;
 
