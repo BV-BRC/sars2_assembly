@@ -419,7 +419,7 @@ if (-s "$out_dir/$base.depth")
 set term png font "LiberationSans-Regular"
 set xlabel "Position"
 set ylabel "Depth"
-set title "Coverage depth for $base"
+set title "Coverage depth for $base" noenhanced
 set output "$out_dir/$base.png"
 plot "$out_dir/$base.depth" using 2:3 with impulses title ""
 set output
@@ -434,9 +434,24 @@ set term png font "LiberationSans-Regular"
 set yrange [0:250]
 set xlabel "Position"
 set ylabel "Depth"
-set title "Coverage depth for $base"
+set title "Coverage depth for $base" noenhanced
 set output "$out_dir/$base.detail.png"
 plot "$out_dir/$base.depth" using 2:3 with impulses title ""
+set output
+END
+    $runner->run(["gnuplot"], "<", \$plot);
+    };
+
+    eval {
+	$ENV{GDFONTPATH} = "/usr/share/fonts/liberation";
+	my $plot = <<END;
+set term png font "LiberationSans-Regular"
+set logscale y 10
+set xlabel "Position"
+set ylabel "Log Depth"
+set title "Coverage depth for $base" noenhanced
+set output "$out_dir/$base.log.png"
+plot "$out_dir/$base.depth" using 2:3 with lines title ""
 set output
 END
     $runner->run(["gnuplot"], "<", \$plot);
