@@ -29,6 +29,10 @@ Submit a set of one or more read libraries to the PATRIC SARS-CoV-2 assembly ser
 
            --recipe                      Assembly recipe. Defaults to auto.
 	   				 Valid values are cdc-nanopore, cdc-illumina, or artic-nanopore
+	   --min-depth			 Minimum coverage limit
+	   --max-depth			 Maximum coverage limit
+	   --primers		    	 Primer set to use
+	   --primer-version		 Primer version to user
            --container-id		 (Internal) Use the specified container to run this application
 
     The following options describe the read libraries:
@@ -76,6 +80,10 @@ my $workspace_path_prefix;
 my $workspace_upload_path;
 my $overwrite;
 my $dry_run;
+my $primers;
+my $primer_version;
+my $min_depth;
+my $max_depth;
 
 my $token = P3AuthToken->new();
 if (!$token->token())
@@ -128,6 +136,10 @@ GetOptions("recipe=s" => \$params->{recipe},
 	   },
 	   "overwrite" => \$overwrite,
 	   "dry-run" => \$dry_run,
+	   "primers=s" => \$primers,
+	   "primer-version=s" => \$primer_version,
+	   "min-depth=s" => \$min_depth,
+	   "max-depth=s" => \$max_depth,
 	   "workspace-path-prefix=s" => \$workspace_path_prefix,
 	   "workspace-upload-path=s" => sub {
 	       my($opt_name, $opt_value) = @_;
@@ -173,6 +185,11 @@ if (!$stat || !S_ISDIR($stat->mode))
     die "Output path $output_path does not exist\n";
 }
 
+$params->{primers} = $primers if defined($primers);
+$params->{primer_version} = $primer_version if defined($primer_version);
+$params->{min_depth} = $min_depth if defined($min_depth);
+$params->{max_depth} = $max_depth if defined($max_depth);
+
 $params->{output_path} = $output_path;
 $params->{output_file} = $output_name;
 my @upload_queue;
@@ -180,6 +197,7 @@ my @upload_queue;
 sub process_filename
 {
     my($path) = @_;
+    return if $dry_run;
     my $wspath;
     if ($path =~ /^ws:(.*)/)
     {
