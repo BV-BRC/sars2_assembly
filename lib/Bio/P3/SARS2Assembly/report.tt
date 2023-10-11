@@ -303,8 +303,8 @@ No features were found.
 [% END -%]
 [% END -%]
 [% END -%]
+</table>
 [% END -%]
-
 
 [% FOREACH vset IN gto.computed_variants -%]
 [% IF vset.tool == "pangolin" -%]
