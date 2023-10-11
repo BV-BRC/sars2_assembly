@@ -308,8 +308,8 @@ No features were found.
 
 [% FOREACH vset IN gto.computed_variants -%]
 [% IF vset.tool == "pangolin" -%]
-<h2>All Pangolin output data
-[% FOR k IN vset.tool_output.keys.sort  %]
+<h2>All Pangolin output data</h2>
+[% FOR k IN vset.tool_output.keys.sort -%]
 [% k %]: [% vset.tool_output.$k %]<br> 
 [% END -%]
 [% END -%]
