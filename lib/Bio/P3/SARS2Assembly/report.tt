@@ -140,9 +140,7 @@
 [% FOREACH vset IN gto.computed_variants -%]
 [% IF vset.tool == "pangolin" -%]
 <h2>Pangolin Lineage</h2><p>
-We analyzed this genome with Pangolin version [% vset.tool_metadata.pangolin_version %] with 
-pangoLEARN version [% vset.tool_metadata.pangoLEARN_version %]  and
-pango version [% vset.tool_metadata.pango_version %].
+We analyzed this genome with Pangolin version [% vset.tool_metadata.pangolin_version %].
 [% IF vset.linage == "None" -%]
 No lineage was able to be computed.
 [% ELSE -%]
@@ -157,15 +155,20 @@ with a conflict of [% vset.conflict %].
 [% IF vset.ambiguity_score.defined -%]
 The ambiguity score is [% vset.ambiguity_score %].
 [% END -%]
-<p>Pangolin status:  [% vset.status %]
+
+<p>Pangolin status:  [% vset.status %]<br>
 [% IF vset.notes.defined -%]
-<p>Pangolin notes:  [% vset.notes %]
+Pangolin notes:  [% vset.notes %]<br>
 [% END -%]
 [% IF vset.note.defined -%]
-<p>Pangolin notes:  [% vset.note %]
+Pangolin notes:  [% vset.note %]<br>
+[% END -%]
+Version information:<br>
+[% FOR k IN vset.tool_metadata.keys.sort  %]
+[% k %]: [% vset.tool_metadata.$k %]<br> 
 [% END -%]
 <p>You can read more about the Pangolin output data at 
-<a href="https://cov-lineages.org/pangolin_docs/output.html">the pangolin documentation site</a>.
+<a href="https://cov-lineages.org/resources/pangolin/output.html">the pangolin documentation site</a>.
 [% END -%]
 [% END -%]
 
@@ -298,6 +301,16 @@ No features were found.
 [% IF m.$key != "" -%]
 <tr><td>[% key %]</td><td>[% m.$key %]</td></tr>
 [% END -%]
+[% END -%]
+[% END -%]
+[% END -%]
+
+
+[% FOREACH vset IN gto.computed_variants -%]
+[% IF vset.tool == "pangolin" -%]
+<h2>All Pangolin output data
+[% FOR k IN vset.tool_output.keys.sort  %]
+[% k %]: [% vset.tool_output.$k %]<br> 
 [% END -%]
 [% END -%]
 [% END -%]

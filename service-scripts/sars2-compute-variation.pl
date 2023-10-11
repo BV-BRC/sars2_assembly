@@ -58,7 +58,8 @@ sub pangolin
 
     my $out = File::Temp->new();
     close($out);
-    my @cmd = ("pangolin", "--outfile", $out, $contigs_file);
+    my $threads = $ENV{P3_ALLOCATED_CPU} // 1;
+    my @cmd = ("pangolin", "--outfile", $out, "--threads", $threads, $contigs_file);
     my $ok = run(\@cmd);
     if (!$ok)
     {
@@ -81,7 +82,7 @@ sub pangolin
     }
 
     my $lin = $res->[0];
-    
+
     #
     # look up pangolin version
     #
@@ -96,12 +97,11 @@ sub pangolin
 	}
     }
 
-    my $tool_md = {
-	pangoLEARN_version => $lin->{pangoLEARN_version},
-	pangolin_version => ($lin->{pangolin_version} // $p_vers),
-	pango_version => $lin->{pango_version},
-	version => $lin->{version},
-    };
+    my $tool_md = {};
+    for my $vkey (grep { /version/ } keys %$lin)
+    {
+	$tool_md->{$vkey} = $lin->{$vkey};
+    }
 
     my $var = {
 	tool => 'pangolin',
