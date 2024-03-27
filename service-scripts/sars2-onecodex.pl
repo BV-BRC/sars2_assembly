@@ -246,7 +246,12 @@ my @minimap_opts = (-K => "20M", 	# Minibatch size
 # Trim polyA tail for alignment (33 bases)
 my $trimmed = "$int_dir/reference_trimmed.fa";
 
-my $ok = $runner->run(["seqtk", "trimfq", "-e", 33, $reference], '>',  $trimmed);
+#
+# Clean up the ID line too to eliminate warnings later.
+#
+my $ok = $runner->run(["perl", "-pe", 's/^(>\S+)\s.*$/\1/', $reference],
+		      '|',
+		      ["seqtk", "trimfq", "-e", 33, '-'], '>',  $trimmed);
 
 $ok or die "Failure $? running seqtk\n";
 
