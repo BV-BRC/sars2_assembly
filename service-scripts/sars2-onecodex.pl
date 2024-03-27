@@ -249,7 +249,7 @@ my $trimmed = "$int_dir/reference_trimmed.fa";
 #
 # Clean up the ID line too to eliminate warnings later.
 #
-my $ok = $runner->run(["perl", "-pe", 's/^(>\S+)\s.*$/\1/', $reference],
+my $ok = $runner->run(["perl", "-pe", 's/^(>\S+).*$/\1/', $reference],
 		      '|',
 		      ["seqtk", "trimfq", "-e", 33, '-'], '>',  $trimmed);
 
