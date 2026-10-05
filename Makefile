@@ -52,7 +52,7 @@ reference: lib/Bio/P3/SARS2Assembly/MN908947.fasta.fai lib/Bio/P3/SARS2Assembly/
 #
 lib/Bio/P3/SARS2Assembly/MN908947.fasta.fai: lib/Bio/P3/SARS2Assembly/MN908947.fasta
 	-bowtie2-build  lib/Bio/P3/SARS2Assembly/MN908947.fasta lib/Bio/P3/SARS2Assembly/MN908947.fasta
-	-$(KB_RUNTIME)/samtools-1.11/bin/samtools faidx lib/Bio/P3/SARS2Assembly/MN908947.fasta
+	-samtools faidx lib/Bio/P3/SARS2Assembly/MN908947.fasta
 
 primer: lib/Bio/P3/SARS2Assembly/SC2_200324.bedpe
 
@@ -77,10 +77,12 @@ lib/Bio/P3/SARS2Assembly/primer_schemes:
 	cp -r primer-schemes lib/Bio/P3/SARS2Assembly/primer_schemes
 	perl rewrite-primers.pl lib/Bio/P3/SARS2Assembly/primer_schemes/nCoV-2019 lib/Bio/P3/SARS2Assembly
 	cd lib/Bio/P3/SARS2Assembly; \
-	if [[ -x $(KB_RUNTIME)/samtools-1.11/bin/samtools ]] ; then \
+	if command -v samtools >/dev/null 2>&1 ; then \
 		for fa in primer_schemes/*/V*/*reference.fasta; do \
-			 $(KB_RUNTIME)/samtools-1.11/bin/samtools faidx $$fa; \
+			 samtools faidx $$fa; \
 		done \
+	else \
+		echo "WARNING: samtools not on PATH; reference .fai indexes were not built" >&2 ; \
 	fi
 
 

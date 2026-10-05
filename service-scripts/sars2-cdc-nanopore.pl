@@ -107,7 +107,14 @@ my $threads = $opt->threads;
 #
 # Adjust path to put the right version of tools in place.
 #
-$ENV{PATH} = "$ENV{KB_RUNTIME}/samtools-1.9/bin:$ENV{KB_RUNTIME}/bcftools-1.9/bin:$ENV{PATH}";
+# samtools and bcftools come from the runtime's default path. This used to prepend
+# samtools-1.9/bin and bcftools-1.9/bin, which no longer exist; a missing directory
+# on PATH is skipped rather than failing, so the prepend silently had no effect and
+# the effective version was whatever the container shipped anyway. Worse, it was not
+# inert everywhere: a container that did still carry those directories would shadow
+# the newer tools, so the version varied by container generation. medaka is still
+# prepended because it genuinely lives outside the default path.
+#
 $ENV{PATH} = "$ENV{KB_RUNTIME}/medaka/bin:$ENV{PATH}";
 
 #

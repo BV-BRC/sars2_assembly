@@ -35,7 +35,14 @@ use PDL;
 use PDL::Stats::Basic;
 use PDL::Ufunc;
 
-$ENV{PATH} = "$ENV{KB_RUNTIME}/samtools-1.11/bin:$ENV{KB_RUNTIME}/bcftools-1.9/bin:$ENV{PATH}";
+#
+# samtools and bcftools come from the runtime's default path. This used to prepend
+# samtools-1.11/bin and bcftools-1.9/bin, which no longer exist; a missing directory
+# on PATH is skipped rather than failing, so the prepend silently had no effect and
+# the effective version was whatever the container shipped anyway. Worse, it was not
+# inert everywhere: a container that did still carry samtools-1.11 would shadow the
+# newer tool, so the version varied by container generation.
+#
 
 #
 # The manifest file holds the definitions of the available organisms and primer sets. Use it to
