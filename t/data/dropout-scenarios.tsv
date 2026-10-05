@@ -1,0 +1,25 @@
+# Primer-site substitutions that ARTIC v5.4.2's five spiked-in oligos exist to
+# handle. One scenario per *independent* drift event, selected with
+# gen_amplicon_reads.py --scenarios this-file --scenario <set>.
+#
+# Positions are 0-based (add 1 for VCF/1-based coordinates). Every substitution
+# was derived by diffing each spike-in against the v5.3.2 oligo at the same
+# coordinates: the spike-ins mismatch the Wuhan reference in exactly these
+# places, which is to say they were designed against a template carrying them.
+#
+# WHY ONE SCENARIO PER MUTATION, NOT ONE GENOME WITH ALL FIVE:
+# amplicon 69 has two spike-ins, and they are alternates for two *different*
+# single mutations, not a pair:
+#     _69_RIGHT_0  ...C.......G...   (reference)
+#     _69_RIGHT_1  ...A.......G...   (handles 21710 only)
+#     _69_RIGHT_2  ...C.......A...   (handles 21717 only)
+# A genome carrying both 21710 and 21717 therefore matches NO oligo in v5.4.2 --
+# it is a chimera no real lineage carries, and testing against it would report a
+# false failure of the scheme. Keep these two scenarios separate.
+#
+# set      pos(0-based)  ref  alt   notes
+amp11      3564          T    C     # under _11_RIGHT_0, 4nt from its 3' end; rescued by _11_RIGHT_1
+amp69a     21710         C    T     # under _69_RIGHT_0, 21nt from its 3' end; rescued by _69_RIGHT_1
+amp69b     21717         G    T     # under _69_RIGHT_0, 14nt from its 3' end; rescued by _69_RIGHT_2
+amp70      21940         G    T     # under _70_RIGHT_0, 13nt from its 3' end; rescued by _70_RIGHT_1
+amp74      22769         G    A     # under _74_LEFT_0,  4nt from its 3' end; rescued by _74_LEFT_1

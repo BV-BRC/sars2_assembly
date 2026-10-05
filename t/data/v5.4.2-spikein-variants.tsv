@@ -11,6 +11,13 @@
 #   21940 -> under amplicon 70 primer, recovered from amplicon 71 insert
 #   22769 -> under amplicon 74 primer, recovered from amplicon 73 insert
 #
+# Applying all five at once makes a genome no real lineage carries: 21710 and 21717
+# sit under the SAME amplicon-69 primer, and v5.4.2's two spike-ins there are
+# alternates for one or the other, never both. That is harmless and deliberate here,
+# because this fixture exists to stress variant RECOVERY and the round-trip test
+# amplifies every amplicon unconditionally. It is not harmless for a dropout test,
+# which needs one scenario per independent mutation -- see dropout-scenarios.tsv.
+#
 # 0-based position, reference base, alternate base.
 3564	T	C
 21710	C	T
