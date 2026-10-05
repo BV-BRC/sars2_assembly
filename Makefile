@@ -98,4 +98,34 @@ deploy-docs:
 
 clean:
 
+#
+# CLIENT_TESTS and SERVER_TESTS are declared above but nothing in Makefile.common
+# consumes them, so the targets live here (after all:, so they do not become the
+# default goal).
+#
+# test-client is hermetic. test-server needs minimap2/samtools/ivar on PATH and
+# skips cleanly without them.
+#
+# In a dev tree KB_RUNTIME is the live runtime; DEPLOY_RUNTIME (/kb/runtime) only
+# exists in a deployment, so prefer KB_RUNTIME when it is set.
+TEST_PERL = $(if $(KB_RUNTIME),$(KB_RUNTIME)/bin/perl,$(DEPLOY_RUNTIME)/bin/perl)
+
+test: test-client test-server
+
+test-client:
+	for t in $(CLIENT_TESTS) ; do \
+		if [ -f $$t ] ; then \
+			echo "== $$t" ; \
+			$(TEST_PERL) $$t || exit 1 ; \
+		fi \
+	done
+
+test-server:
+	for t in $(SERVER_TESTS) ; do \
+		if [ -f $$t ] ; then \
+			echo "== $$t" ; \
+			$(TEST_PERL) $$t || exit 1 ; \
+		fi \
+	done
+
 include $(TOP_DIR)/tools/Makefile.common.rules

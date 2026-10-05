@@ -1,0 +1,26 @@
+# Substitutions the ARTIC v5.4.2 spike-in primers are designed against, derived by
+# comparing each new primer to Wuhan-Hu-1 (MN908947.3) at its own coordinates.
+#
+# Every one of these sits UNDER a primer-binding site, so after ivar trim removes the
+# primer the position has no coverage from its own amplicon. It must be recovered from
+# the overlapping neighbour, which is the property the round-trip test pins:
+#
+#   3564  -> under amplicon 11 primer, recovered from amplicon 12 insert
+#   21710 -> under amplicon 69 primer, recovered from amplicon 70 insert
+#   21717 -> under amplicon 69 primer, recovered from amplicon 70 insert
+#   21940 -> under amplicon 70 primer, recovered from amplicon 71 insert
+#   22769 -> under amplicon 74 primer, recovered from amplicon 73 insert
+#
+# Applying all five at once makes a genome no real lineage carries: 21710 and 21717
+# sit under the SAME amplicon-69 primer, and v5.4.2's two spike-ins there are
+# alternates for one or the other, never both. That is harmless and deliberate here,
+# because this fixture exists to stress variant RECOVERY and the round-trip test
+# amplifies every amplicon unconditionally. It is not harmless for a dropout test,
+# which needs one scenario per independent mutation -- see dropout-scenarios.tsv.
+#
+# 0-based position, reference base, alternate base.
+3564	T	C
+21710	C	T
+21717	G	T
+21940	G	T
+22769	G	A
